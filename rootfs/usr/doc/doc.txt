@@ -1,0 +1,95 @@
+# Documentation
+------------------------------------------------------
+MIT License
+------------------------------------------------------
+
+Copyright 2026 potato-master369
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------
+END MIT License
+------------------------------------------------------
+
+## Preamble
+
+Thank you for using almond. It was and still is a dream of mine to be making an OS from scratch, so its amazing that you're here to see that dream come true. As such, feel free to read this documentation to figure out how to use almond. It isn't too unfamiliar, but it definitely has some changes compared to say, Linux.
+
+# Rootfs
+
+Almond's root filesystem (henceforth the rootfs), is the root (/) of the disk. It contains some folders that are used for storing OS and user files.
+
+/
+  /usr - This is where the system resources go
+    /share - Stuff shared for the OS
+    /local - local stuff; ie not for the OS
+  /etc
+    /almond-release - almond release info
+  /boot
+    /almond.bin - almond kernel
+  /bin - This is where binaries go. Unlike linux, theres only /usr/local/bin and /bin.
+  /home
+    /{USER} - {USER} home directory.
+
+The above diagram shows the rootfs folder structure, in rough.
+
+# Bootloader
+
+ABL, the Almond BootLoader, is stored, on the first 64 sectors of the disk. This is for AT harddisk compatibility.
+
+Do not overwrite these sectors.
+
+## ABLR shell reference
+
+The ABLR shell can be used to perform basic recovery tasks.
+
+Type,
+
+> help
+
+to get more information.
+
+ABLR shell operates on the following model.
+
+Only one disk and one partition can be selected at a time, much like fdisk. So, you can run
+
+> sel part N
+> sel disk N
+
+to set that.
+
+> lsdsk
+> lspart
+
+The above commands list disks and partitions.
+
+## Manual boot process
+
+> loadkern /boot/almond.bin
+
+This command loads the kernel (replace the path /boot/almond.bin with wherever your kernel is), to the 1MiB offset. This command is useful for loading custom kernels in a non-standard path.
+
+> set cmdline [CMDLINE]
+
+Set the command line for the kernel. The only requirement is root.
+
+See ## Kernel parameters for more information.
+
+> boot
+
+The above command boots the kernel.
+
+## Kernel parameters
+
+The below parameters are used for boot
+
+root=DISK,PART
+
+Sets the root partition. Required for boot.
+e.g. root=ide0,0
+
+Use the pretty name from ABLR's `lsdsk` for that.

@@ -1,0 +1,18 @@
+Errors for Almond
+----------------------------------
+
+ABS: Almond Boot Sector
+
+E0001: Failed to find stage II bootloader at sectors 2-63
+    This error indicates that the bootloader was not found.
+    The stage II code should be there. Check if they were
+    found.
+    Fixes:
+    Get a new image. Or your disk is broken.
+
+ABL: Almond Stage II Bootloader
+
+E7001: IDE read fail
+E7002: IDE write fail
+W7010: Invalid partition read/write
+W7011: Invalid offset for partition read/write

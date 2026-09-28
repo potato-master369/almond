@@ -1,0 +1,136 @@
+#include <stdio.h>
+#include <stdbool.h>
+
+#define SCANCODE_MAX 0x85 
+
+// Layout Indices
+#define LAYOUT_US  0
+#define LAYOUT_JIS 1
+#define LAYOUT_ISO 2
+
+// Case Indices
+#define CASE_LOWER 0
+#define CASE_UPPER 1
+
+// Unified Multi-Layout Matrix
+// Format: [Scancode][Layout][0 = Lowercase, 1 = Uppercase]
+const char scancode_to_ascii[SCANCODE_MAX][3][2] = {
+    // Letters (Identical across US, JIS, ISO)
+    [0x1C] = { {'a', 'A'}, {'a', 'A'}, {'a', 'A'} },
+    [0x32] = { {'b', 'B'}, {'b', 'B'}, {'b', 'B'} },
+    [0x21] = { {'c', 'C'}, {'c', 'C'}, {'c', 'C'} },
+    [0x23] = { {'d', 'D'}, {'d', 'D'}, {'d', 'D'} },
+    [0x24] = { {'e', 'E'}, {'e', 'E'}, {'e', 'E'} },
+    [0x2B] = { {'f', 'F'}, {'f', 'F'}, {'f', 'F'} },
+    [0x34] = { {'g', 'G'}, {'g', 'G'}, {'g', 'G'} },
+    [0x33] = { {'h', 'H'}, {'h', 'H'}, {'h', 'H'} },
+    [0x43] = { {'i', 'I'}, {'i', 'I'}, {'i', 'I'} },
+    [0x3B] = { {'j', 'J'}, {'j', 'J'}, {'j', 'J'} },
+    [0x42] = { {'k', 'K'}, {'k', 'K'}, {'k', 'K'} },
+    [0x4B] = { {'l', 'L'}, {'l', 'L'}, {'l', 'L'} },
+    [0x3A] = { {'m', 'M'}, {'m', 'M'}, {'m', 'M'} },
+    [0x31] = { {'n', 'N'}, {'n', 'N'}, {'n', 'N'} },
+    [0x44] = { {'o', 'O'}, {'o', 'O'}, {'o', 'O'} },
+    [0x4D] = { {'p', 'P'}, {'p', 'P'}, {'p', 'P'} },
+    [0x15] = { {'q', 'Q'}, {'q', 'Q'}, {'q', 'Q'} },
+    [0x2D] = { {'r', 'R'}, {'r', 'R'}, {'r', 'R'} },
+    [0x1B] = { {'s', 'S'}, {'s', 'S'}, {'s', 'S'} },
+    [0x2C] = { {'t', 'T'}, {'t', 'T'}, {'t', 'T'} },
+    [0x3C] = { {'u', 'U'}, {'u', 'U'}, {'u', 'U'} },
+    [0x2A] = { {'v', 'V'}, {'v', 'V'}, {'v', 'V'} },
+    [0x1D] = { {'w', 'W'}, {'w', 'W'}, {'w', 'W'} },
+    [0x22] = { {'x', 'X'}, {'x', 'X'}, {'x', 'X'} },
+    [0x35] = { {'y', 'Y'}, {'y', 'Y'}, {'y', 'Y'} },
+    [0x1A] = { {'z', 'Z'}, {'z', 'Z'}, {'z', 'Z'} },
+
+    // Core Numbers (Varying shifted states)
+    [0x16] = { {'1', '!'}, {'1', '!'}, {'1', '!'} },
+    [0x1E] = { {'2', '@'}, {'2', '"'}, {'2', '"'} }, // US: @ | JIS/ISO: "
+    [0x26] = { {'3', '#'}, {'3', '#'}, {'3', £} },   // ISO uses £ symbol (Extended ASCII/UTF-8 representation placeholder)
+    [0x25] = { {'4', '$'}, {'4', '$'}, {'4', '$'} },
+    [0x2E] = { {'5', '%'}, {'5', '%'}, {'5', '%'} },
+    [0x36] = { {'6', '^'}, {'6', '&'}, {'6', '^'} }, // JIS shifted 6 is &
+    [0x3D] = { {'7', '&'}, {'7', '\''},{'7', '/'} }, // JIS: ' | ISO: /
+    [0x3E] = { {'8', '*'}, {'8', '('}, {'8', '('} }, // JIS/ISO shifted 8 is (
+    [0x46] = { {'9', '('}, {'9', ')'}, {'9', ')'} }, // JIS/ISO shifted 9 is )
+    [0x45] = { {'0', ')'}, {'0', ' '}, {'0', '='} }, // JIS: Unshifted 0 is 0, Shifted is blank/mod | ISO: =
+
+    // White Spaces / Control Keys
+    [0x29] = { {' ', ' '}, {' ', ' '}, {' ', ' '} },
+    [0x5A] = { {'\n', '\n'}, {'\n', '\n'}, {'\n', '\n'} },
+    [0x66] = { {'\b', '\b'}, {'\b', '\b'}, {'\b', '\b'} },
+    [0x0D] = { {'\t', '\t'}, {'\t', '\t'}, {'\t', '\t'} },
+
+    // Symbols & Region Specific Variations
+    [0x0E] = { {'`', '~'}, {'^', '~'}, {'`', '¬'} }, // US: ` | JIS: ^ | ISO: ` (notable layout delta)
+    [0x4E] = { {'-', '_'}, {'-', '='}, {'-', '_'} }, // JIS shifted - is =
+    [0x55] = { {'=', '+'}, {'', '`'},  {'=', '+'} }, // JIS 0x55 is ほ key (un-shifted yields nothing clean, shifted `)
+    [0x54] = { {'[', '{'}, {'@', '`'},  {'[', '{'} }, // JIS 0x54 layout acts as the @ key mapping
+    [0x5B] = { {']', '}'}, {'[', '{'},  {']', '}'} }, // JIS 0x5B acts as [
+    [0x5D] = { {'\\', '|'},{0, 0},     {0, 0} },     // US ANSI Backslash (doesn't exist here physically on standard ISO/JIS)
+    [0x4C] = { {';', ':'}, {';', '+'}, {';', ':'} }, // JIS shifted ; is +
+    [0x52] = { {'\'', '"'},{':', '*'}, {'\'', '@'} },// US: ' | JIS: : | ISO: ' and @
+    [0x41] = { {',', '<'}, {',', '<'}, {',', '<'} },
+    [0x49] = { {'.', '>'}, {'.', '>'}, {'.', '>'} },
+    [0x4A] = { {'/', '?'}, {'/', '?'}, {'/', '?'} },
+
+    // Special Physical Variant Keys (JIS/ISO Layout Extensions)
+    [0x61] = { {0, 0},     {0, 0},     {'\\', '|'} },// ISO physical Extra Key (Next to Left Shift)
+    [0x51] = { {0, 0},     {'\\', '_'},{0, 0} },     // JIS Ro key (\\ and _)
+    [0x13] = { {0, 0},     {'\\', '|'},{0, 0} }      // JIS Yen key (\\ and |)
+};
+
+// Global state tracking
+static bool shift_pressed = false;
+static bool caps_lock_on   = false;
+static bool is_release     = false;
+
+char translate_ps2_to_ascii(unsigned char scancode, int target_layout) {
+    if (scancode == 0xF0) { is_release = true; return 0; }
+    if (scancode == 0xE0) return 0;
+
+    // Shift Tracking
+    if (scancode == 0x12 || scancode == 0x59) {
+        shift_pressed = !is_release;
+        is_release = false;
+        return 0;
+    }
+    // Caps Lock Tracking
+    if (scancode == 0x58) {
+        if (!is_release) caps_lock_on = !caps_lock_on;
+        is_release = false;
+        return 0;
+    }
+
+    if (is_release) { is_release = false; return 0; }
+    if (scancode >= SCANCODE_MAX) return 0;
+
+    // Check base mapping using US mapping to deduce if character is basic alphabet
+    char base_us_char = scancode_to_ascii[scancode][LAYOUT_US][CASE_LOWER];
+    bool is_letter = (base_us_char >= 'a' && base_us_char <= 'z');
+    
+    // Choose Case Array Index
+    int case_idx = is_letter ? (shift_pressed ^ caps_lock_on) : shift_pressed;
+
+    return scancode_to_ascii[scancode][target_layout][case_idx];
+}
+
+int main() {
+    // Simulation: Scancode 0x1E ('2' Key)
+    unsigned char scancode = 0x1E; 
+    
+    printf("Simulating Key 0x1E unshifted:\n");
+    printf("  US : %c\n", translate_ps2_to_ascii(scancode, LAYOUT_US));
+    printf("  JIS: %c\n", translate_ps2_to_ascii(scancode, LAYOUT_JIS));
+    printf("  ISO: %c\n", translate_ps2_to_ascii(scancode, LAYOUT_ISO));
+
+    // Force Shift state on for next test
+    shift_pressed = true;
+    printf("\nSimulating Key 0x1E with Shift active:\n");
+    printf("  US : %c\n", translate_ps2_to_ascii(scancode, LAYOUT_US)); // Yields '@'
+    printf("  JIS: %c\n", translate_ps2_to_ascii(scancode, LAYOUT_JIS)); // Yields '"'
+    printf("  ISO: %c\n", translate_ps2_to_ascii(scancode, LAYOUT_ISO)); // Yields '"'
+
+    return 0;
+}
+
