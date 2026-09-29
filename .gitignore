@@ -1,6 +1,8 @@
 disk.img
 rootfs
 rootfs/*
+obj
+obj/*
 *.elf
 *.bin
 *.html
