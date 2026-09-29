@@ -7,11 +7,10 @@
 #include "../../kernel_types.h"
 #include "../../messaging/messaging.h"
 #include "../disk.h"
+#include "ide.h"
 
 // settings
-struct {
-  bool_t dma;
-} ide_featuremask = {.dma = false};
+ide_featuremask_t ide_featuremask = {.dma = false};
 
 // register mappings
 #define ATA_PRIMARY_IO 0x1F0
@@ -57,6 +56,8 @@ uint8_t ide_read(disk_info_t *self, uint32_t lba, uint32_t n, void *to) {
   if (lba > self->size || n > self->size - lba)
 	  return DISK_ERR_RANGE;
   if (!ide_featuremask.dma) {
+
+  } else {
     uint16_t *buf16 = (uint16_t *)to;
     uint8_t drv_id = self->resv & 0xFF;
     uint16_t io = ide_io_base(drv_id);
@@ -91,7 +92,6 @@ uint8_t ide_read(disk_info_t *self, uint32_t lba, uint32_t n, void *to) {
       for (int i = 0; i < 256; i++)
         *buf16++ = inw(io + ATA_REG_DATA);
     }
-  } else {
   }
   return 0;
 }
@@ -100,6 +100,8 @@ uint8_t ide_write(disk_info_t *self, uint32_t lba, uint32_t n, void *from) {
   if (lba > self->size || n > self->size - lba)
 	  return DISK_ERR_RANGE;
   if (!ide_featuremask.dma) {
+
+  } else {
     uint16_t *buf16 = (uint16_t *)from;
 
     uint8_t drv_id = self->resv & 0xFF;
@@ -146,7 +148,6 @@ uint8_t ide_write(disk_info_t *self, uint32_t lba, uint32_t n, void *from) {
       ;
     if (timeout == 0)
       return DISK_ERR_HW;
-  } else {
   }
   return 0;
 }

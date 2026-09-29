@@ -22,6 +22,8 @@ void bsman_update(const char *msg) {
   while (msg[i] != '\0') {
     for (uint16_t y = 0; y < 16; ++y) {
       uint8_t row = terminus_fon[msg[i]][y];
+      if ((i * 8) + 8 >= fb0.width)
+        break;
       for (uint16_t x = 0; x < 8; ++x) {
         fb0.write_pixel((i * 8) + x, fb0.height - 16 + y, (row & (1 << x)) ? 0x00000000 : 0xffffffff, &fb0);
       }

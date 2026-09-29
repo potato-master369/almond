@@ -9,9 +9,7 @@
 #include "drv/ide.h"
 
 // these should be set in kmain
-struct {
-  bool_t ide;  
-} disk_drivermasks = {
+disk_featuremask_t disk_drivermasks = {
   .ide = false
 };
 

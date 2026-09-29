@@ -6,7 +6,7 @@ OBJCOPY  = i686-elf-objcopy
 ASM      = nasm
 
 # Flags
-CFLAGS   = -ffreestanding -nostdlib -Os -Wall -Wextra -Isrc/boot -march=i486 -mtune=i486 -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fshort-enums -fno-pie -fno-pic
+CFLAGS   = -ffreestanding -nostdlib -Os -Wall -Wextra -Isrc/boot -march=pentium -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fshort-enums -fno-pie -fno-pic
 ASMFLAGS = -f elf32
 
 # Directories & Objects
@@ -17,7 +17,7 @@ ASM_OBJ  = $(OBJDIR)/stub.o
 LDSCRIPT = src/boot/linker.ld
 
 OBJDIRKERN = obj/kernel
-C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c
+C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c
 C_OBJSKERN = $(patsubst src/kernel/%.c,$(OBJDIRKERN)/%.o,$(C_SRCSKERN))
 ASM_OBJKERN = $(OBJDIRKERN)/stub.o $(OBJDIRKERN)/idt/isr.o
 LDSCRIPTKERN = src/kernel/linker.ld
@@ -47,6 +47,7 @@ $(OBJDIRKERN):
 	mkdir -p $(OBJDIRKERN)/helpers
 	mkdir -p $(OBJDIRKERN)/disk
 	mkdir -p $(OBJDIRKERN)/disk/drv
+	mkdir -p $(OBJDIRKERN)/pci
 
 # Compile C files into obj/boot/
 $(OBJDIR)/%.o: src/boot/%.c

@@ -29,5 +29,8 @@ typedef struct partition_info {
   uint8_t (*read)(struct partition_info *self, const char *filename, void *from);
 } partition_info_t;
 
+typedef struct {
+  bool_t ide;
+} disk_featuremask_t;
 void disk_init(void);
 #endif

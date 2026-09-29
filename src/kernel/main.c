@@ -11,11 +11,16 @@
 #include "framebuffer/fb.h"
 #include "framebuffer/bsman.h"
 #include "panic.h"
+#include "cmdline.h"
 #include "disk/disk.h"
+#include "pci/pci.h"
 
 extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
 
+core_featuremask_t core_featuremask = {
+  .bsman = false
+};
 almond_handoff_t handoff_kerncopy;
 void kmain(almond_handoff_t *f) {
   if (f->magic[0] != 'a' || f->magic[1] != 'l' || f->magic[2] != 'm' ||
@@ -29,6 +34,7 @@ void kmain(almond_handoff_t *f) {
   message_send_message(" kmain: cmdline: ");
   message_send_message(handoff_kerncopy.cmdline);
   message_send_message("\n");
+  cmdline_parse_cmdline(handoff_kerncopy.cmdline);
   char buf[64];
   itoa((int)(handoff_kerncopy.mmap_ptr), buf);
   message_send_message(" kmain: mmap pointer at ");
@@ -49,15 +55,18 @@ void kmain(almond_handoff_t *f) {
       fb0.write_pixel((fb0.width / 2 - 320) + x, (fb0.height / 2 - 240) + y, bootsplash_img[y * 640 + x], &fb0);
     }
   }
-  for (int y = fb0.height - 16; y < fb0.height; ++y) {
-    for (int x = 0; x < fb0.width; ++x) {
+  for (uint32_t y = fb0.height - 16; y < fb0.height; ++y) {
+    for (uint32_t x = 0; x < fb0.width; ++x) {
       fb0.write_pixel(x, y, 0xffffffff, &fb0);
     }
   }
   fb0.update_fb(&fb0);
+  if (!core_featuremask.bsman)
   bsman_init();
   message_send_message(" kmain: quack!\n");
   disk_init();
+  pci_init();
   for (;;)
     ;
 }
+
