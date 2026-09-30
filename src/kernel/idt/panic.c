@@ -135,6 +135,11 @@ void idt_vga_write(const char *s, uint16_t attr) {
 static volatile int in_panic = 0;
 
 void idt_c_handler(idt_registers_t *a) {
+  char reportbuf[21];
+  message_send_message(" idt: IRQ 0x");
+  itoa_hex(a->int_no, reportbuf);
+  message_send_message(reportbuf);
+  message_send_message("\n");
   if (a->int_no < 0x20) {
     __asm__ __volatile__("cli");
 

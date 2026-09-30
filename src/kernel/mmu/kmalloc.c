@@ -199,6 +199,32 @@ void *kmalloc(uint32_t size) {
   return header + 1;
 }
 
+void *kmalloc_aligned(uint32_t size, uint32_t align) {
+  // If alignment is 0 or 1, standard kmalloc is sufficient
+  if (align <= 1) {
+    return kmalloc(size);
+  }
+
+  uint32_t total_size = size + align + sizeof(void *);
+
+  void *raw_ptr = kmalloc(total_size);
+  if (raw_ptr == 0) {
+    return 0;
+  }
+
+  // Calculate the raw address plus space reserved for storing the original pointer
+  uint32_t raw_addr = (uint32_t)(uintptr_t)raw_ptr + sizeof(void *);
+
+  // Align the address upward to the nearest multiple of 'align'
+  uint32_t aligned_addr = (raw_addr + align - 1) & ~(align - 1);
+
+  // Store the original raw pointer right before the aligned address
+  void **stored_ptr_slot = (void **)(uintptr_t)(aligned_addr - sizeof(void *));
+  *stored_ptr_slot = raw_ptr;
+
+  return (void *)aligned_addr;
+}
+
 void kfree(void *ptr) {
   kmalloc_header_t *header;
 
@@ -234,4 +260,27 @@ void kfree(void *ptr) {
       kmalloc_unmap_pages(slab, 1);
     }
   }
+}
+
+void kfree_aligned(void *ptr) {
+  if (ptr == 0) {
+    return;
+  }
+  // Retrieve the original raw pointer stored right before the aligned address
+  void *raw_ptr = *((void **)((uint32_t)(uintptr_t)ptr - sizeof(void *)));
+
+  // Pass the original pointer to your base kfree implementation
+  kfree(raw_ptr);
+}
+
+// get phys address.
+// Returns 0 if not mapped or null
+uint32_t kmalloc_virt_to_phys(uint32_t virtual_address) {
+  vmm_pagemap_t pagemap = vmm_current_pagemap();
+  uint32_t state = vmm_get_page_state(pagemap, virtual_address);
+
+  if ((state & 1u) == 0) {
+    return 0;
+  }
+  return (state & ~(VMM_PAGE_SIZE - 1u)) | (virtual_address & (VMM_PAGE_SIZE - 1u));
 }

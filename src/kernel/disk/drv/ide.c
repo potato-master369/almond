@@ -1,18 +1,21 @@
 // ide.c
 // -----------------------------
-// ATA IDE driver for Almond
+// ata ide driver for almond
 
+// history
+// -----------------------------
+// Tried to ai slop it, didnt go well, so i restored it.
+#include "ide.h"
 #include "../../helpers/string.h"
 #include "../../kernel_ports.h"
 #include "../../kernel_types.h"
 #include "../../messaging/messaging.h"
 #include "../disk.h"
-#include "ide.h"
 
 // settings
 ide_featuremask_t ide_featuremask = {.dma = false};
 
-// register mappings
+// macros
 #define ATA_PRIMARY_IO 0x1F0
 #define ATA_PRIMARY_CTRL 0x3F6
 #define ATA_SECONDARY_IO 0x170
@@ -29,68 +32,121 @@ ide_featuremask_t ide_featuremask = {.dma = false};
 #define ATA_REG_STATUS 7
 
 #define ATA_CMD_READ_PIO 0x20
+#define ATA_CMD_READ_PIO_EXT 0x24
 #define ATA_CMD_WRITE_PIO 0x30
+#define ATA_CMD_WRITE_PIO_EXT 0x34
 #define ATA_CMD_CACHE_FLUSH 0xE7
+#define ATA_CMD_CACHE_FLUSH_EXT 0xEA
 #define ATA_CMD_IDENTIFY 0xEC
+#define ATA_CMD_READ_DMA28 0xC8
+#define ATA_CMD_WRITE_DMA28 0xCA
+#define ATA_CMD_READ_DMA48 0x25
+#define ATA_CMD_WRITE_DMA48 0x35
 
 #define ATA_SR_ERR 0x01
 #define ATA_SR_DRQ 0x08
+#define ATA_SR_DF 0x20
 #define ATA_SR_BSY 0x80
 
+#define ATA_CTRL_NIEN 0x02
+
+// Bus Master IDE registers
+#define BM_CMD 0x00
+#define BM_STATUS 0x02
+#define BM_PRDT 0x04
+#define BM_CMD_START 0x01
+#define BM_CMD_READ 0x08 // 1 = device -> memory
+#define BM_ST_ACTIVE 0x01
+#define BM_ST_ERR 0x02
+#define BM_ST_IRQ 0x04
+
 #define DRV_ID_IDE 0x0001
+#define DRV_IDE_MMIO_PRI 0xFFFF0000u
+#define DRV_IDE_MMIO_SEC 0xFFFF1000u
+
+#define IDE_TIMEOUT 2000000u
+#define IDE_PRD_MAX 33 
+#define IDE_LBA28_LIMIT 0x10000000u
+
+typedef struct {
+  uint32_t dba;
+  uint16_t bc;
+  uint16_t flags; // bit 15 = EOT
+} __attribute__((packed)) ide_prd_entry_t;
+
+typedef struct {
+  uintptr_t base;
+  bool_t mmio;
+  bool_t ok;
+} ide_bm_chan_t;
+
+static ide_bm_chan_t ide_bm[2];
+static ide_prd_entry_t *ide_prd[2];
+
+static struct {
+  bool_t lba48;
+  bool_t dma;
+} ide_drive[4];
+
 // helpers
-static inline uint16_t ide_io_base(uint8_t internal_id) {
-  return (internal_id & 0x02) ? ATA_SECONDARY_IO : ATA_PRIMARY_IO;
+static inline uint16_t ide_io_base(uint8_t id) {
+  return (id & 0x02) ? ATA_SECONDARY_IO : ATA_PRIMARY_IO;
 }
 
-static inline uint16_t ide_ctrl_base(uint8_t internal_id) {
-  return (internal_id & 0x02) ? ATA_SECONDARY_CTRL : ATA_PRIMARY_CTRL;
+static inline uint16_t ide_ctrl_base(uint8_t id) {
+  return (id & 0x02) ? ATA_SECONDARY_CTRL : ATA_PRIMARY_CTRL;
 }
 
-static inline uint8_t ide_slave_bit(uint8_t drv_id) { return (drv_id & 0x01); }
+static inline uint8_t ide_slave_bit(uint8_t id) { return id & 0x01; }
 
-// standard r/w functions
-//  - the else block of !ide_featuremask.dma is for
-//    backup PIO read
+uint8_t ide_read_sec(uint32_t sector_offset, void *buf, uint8_t drv_id) {
+  uint16_t io = ide_io_base(drv_id);
+  uint8_t slave = ide_slave_bit(drv_id);
+  uint8_t status;
+
+  while (inb(io + ATA_REG_STATUS) & ATA_SR_BSY)
+    ;
+
+  outb(io + ATA_REG_HDDEVSEL,
+       0xE0 | (slave << 4) | ((sector_offset >> 24) & 0x0F));
+
+  outb(io + ATA_REG_SECCOUNT0, 1);
+  outb(io + ATA_REG_LBA0, (uint8_t)(sector_offset & 0xFF));
+  outb(io + ATA_REG_LBA1, (uint8_t)((sector_offset >> 8) & 0xFF));
+  outb(io + ATA_REG_LBA2, (uint8_t)((sector_offset >> 16) & 0xFF));
+  outb(io + ATA_REG_COMMAND, ATA_CMD_READ_PIO);
+
+  do {
+    status = inb(io + ATA_REG_STATUS);
+  } while (status & ATA_SR_BSY);
+
+  if (status & ATA_SR_ERR) {
+    return 0xFF;
+  }
+
+  while (!(inb(io + ATA_REG_STATUS) & ATA_SR_DRQ))
+    ;
+
+  uint16_t *buf16 = (uint16_t *)buf;
+  for (int i = 0; i < 256; i++) {
+    buf16[i] = inw(io + ATA_REG_DATA);
+  }
+  return 0;
+}
+
+
 uint8_t ide_read(disk_info_t *self, uint32_t lba, uint32_t n, void *to) {
   if (lba > self->size || n > self->size - lba)
-	  return DISK_ERR_RANGE;
-  if (!ide_featuremask.dma) {
+    return DISK_ERR_RANGE;
 
-  } else {
-    uint16_t *buf16 = (uint16_t *)to;
-    uint8_t drv_id = self->resv & 0xFF;
-    uint16_t io = ide_io_base(drv_id);
-    uint8_t slave = ide_slave_bit(drv_id);
+  uint16_t *buf16 = (uint16_t *)to;
+  uint8_t drv_id = self->resv & 0xFF;
+  uint16_t io = ide_io_base(drv_id);
+  uint8_t slave = ide_slave_bit(drv_id);
 
-    for (uint32_t sector = 0; sector < n; sector++) {
-      uint32_t current_lba = lba + sector;
-      uint32_t timeout = 100000;
-      while ((inb(io + ATA_REG_STATUS) & ATA_SR_BSY) && --timeout)
-        ;
-      if (timeout == 0)
-        return DISK_ERR_HW;
-
-      outb(io + ATA_REG_HDDEVSEL,
-           0xE0 | (slave << 4) | ((current_lba >> 24) & 0x0F));
-      outb(io + ATA_REG_SECCOUNT0, 1);
-      outb(io + ATA_REG_LBA0, (uint8_t)(current_lba & 0xFF));
-      outb(io + ATA_REG_LBA1, (uint8_t)((current_lba >> 8) & 0xFF));
-      outb(io + ATA_REG_LBA2, (uint8_t)((current_lba >> 16) & 0xFF));
-      outb(io + ATA_REG_COMMAND, ATA_CMD_READ_PIO);
-
-      uint8_t status = inb(io + ATA_REG_STATUS);
-      timeout = 100000;
-      while (!(status & ATA_SR_ERR) &&
-             ((status & ATA_SR_BSY) || !(status & ATA_SR_DRQ)) && timeout) {
-        status = inb(io + ATA_REG_STATUS);
-        --timeout;
-      }
-      if (timeout == 0 || (status & ATA_SR_ERR) || !(status & ATA_SR_DRQ))
-        return DISK_ERR_HW;
-
-      for (int i = 0; i < 256; i++)
-        *buf16++ = inw(io + ATA_REG_DATA);
+  for (uint32_t sector = 0; sector < n; sector++) {
+    if (ide_read_sec(sector, to, self->resv) != 0) {
+      return DISK_ERR_HW;
     }
   }
   return 0;
@@ -98,56 +154,64 @@ uint8_t ide_read(disk_info_t *self, uint32_t lba, uint32_t n, void *to) {
 
 uint8_t ide_write(disk_info_t *self, uint32_t lba, uint32_t n, void *from) {
   if (lba > self->size || n > self->size - lba)
-	  return DISK_ERR_RANGE;
+    return DISK_ERR_RANGE;
   if (!ide_featuremask.dma) {
-
+    // Fallback or handle non-DMA case if needed
   } else {
-    uint16_t *buf16 = (uint16_t *)from;
-
+    const uint16_t *buf16 = (const uint16_t *)from;
     uint8_t drv_id = self->resv & 0xFF;
     uint16_t io = ide_io_base(drv_id);
     uint8_t slave = ide_slave_bit(drv_id);
-    for (uint32_t sector = 0; sector < n; sector++) {
 
+    for (uint32_t sector = 0; sector < n; sector++) {
       uint32_t current_lba = lba + sector;
-      // Wait for BSY to clear with a safety timeout
       uint32_t timeout = 100000;
+      
+      // Wait for drive to be ready (not busy)
       while ((inb(io + ATA_REG_STATUS) & ATA_SR_BSY) && --timeout)
         ;
       if (timeout == 0)
         return DISK_ERR_HW;
 
+      // Select drive and set up LBA/Sector count
       outb(io + ATA_REG_HDDEVSEL,
            0xE0 | (slave << 4) | ((current_lba >> 24) & 0x0F));
       outb(io + ATA_REG_SECCOUNT0, 1);
       outb(io + ATA_REG_LBA0, (uint8_t)(current_lba & 0xFF));
       outb(io + ATA_REG_LBA1, (uint8_t)((current_lba >> 8) & 0xFF));
       outb(io + ATA_REG_LBA2, (uint8_t)((current_lba >> 16) & 0xFF));
-
       outb(io + ATA_REG_COMMAND, ATA_CMD_WRITE_PIO);
 
-      timeout = 100000;
+      // Wait for DRQ (Data Request) to write data
       uint8_t status;
-      while (!(((status = inb(io + ATA_REG_STATUS)) &
-                (ATA_SR_DRQ | ATA_SR_ERR))) &&
-             --timeout)
-        ;
+      timeout = 100000;
+      do {
+        status = inb(io + ATA_REG_STATUS);
+        --timeout;
+      } while (!(status & ATA_SR_ERR) && 
+               ((status & ATA_SR_BSY) || !(status & ATA_SR_DRQ)) && 
+               timeout);
 
-      if (timeout == 0 || (status & ATA_SR_ERR)) {
+      if (timeout == 0 || (status & ATA_SR_ERR) || !(status & ATA_SR_DRQ))
         return DISK_ERR_HW;
-      }
 
-      for (int i = 0; i < 256; i++) {
+      // Write the 256 words (512 bytes) for this sector
+      for (int i = 0; i < 256; i++)
         outw(io + ATA_REG_DATA, *buf16++);
-      }
+
+      // CRITICAL: Wait for BSY to clear after the write transfer completes
+      timeout = 100000;
+      while ((inb(io + ATA_REG_STATUS) & ATA_SR_BSY) && --timeout)
+        ;
+      if (timeout == 0)
+        return DISK_ERR_HW;
     }
 
+    // Optional but recommended: Flush cache after writing batch
     outb(io + ATA_REG_COMMAND, ATA_CMD_CACHE_FLUSH);
-    uint32_t timeout = 100000;
+    uint32_t timeout = 1000000;
     while ((inb(io + ATA_REG_STATUS) & ATA_SR_BSY) && --timeout)
       ;
-    if (timeout == 0)
-      return DISK_ERR_HW;
   }
   return 0;
 }

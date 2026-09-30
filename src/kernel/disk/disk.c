@@ -4,6 +4,7 @@
 #include "../kernel_types.h"
 #include "disk.h"
 #include "../messaging/messaging.h"
+#include "../helpers/string.h"
 
 // drivers
 #include "drv/ide.h"
@@ -21,4 +22,18 @@ void disk_init(void) {
   if (!disk_drivermasks.ide) {
     ide_init(disk_db);
   }
+  message_send_message(" disk: init finish\n");
+}
+
+uint8_t disk_get_by_prettyname(const char *pretty_name) {
+  for (int i = 0; i < DISK_MAX; ++i) {
+    if(strncmp(disk_db[i].pretty_name, pretty_name, sizeof(disk_db[i].pretty_name)) == 0) {
+      return i;
+    }
+  }
+  return 255;
+}
+
+disk_info_t *disk_get_disk(uint8_t n) {
+  return &(disk_db[n]);
 }

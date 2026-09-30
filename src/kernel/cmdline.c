@@ -29,7 +29,7 @@ void cmdline_parse_cmdline(const char *cmdline) {
     message_send_message("\"\n");
     if (strncmp(wordbuf, "root=", 5) == 0) {
 
-    } else if (strncmp(wordbuf, "-ide.drm", sizeof(wordbuf)) == 0) {
+    } else if (strncmp(wordbuf, "-ide.dma", sizeof(wordbuf)) == 0) {
       ide_featuremask.dma = true;
     } else if (strncmp(wordbuf, "-ide", sizeof(wordbuf)) == 0) {
       disk_drivermasks.ide = true;

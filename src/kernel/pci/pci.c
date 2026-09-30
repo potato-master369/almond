@@ -2,10 +2,16 @@
 // --------------------------
 // Scan PCI driver for PCI operations
 
+#include "pci.h"
 #include "../helpers/string.h"
 #include "../kernel_ports.h"
 #include "../kernel_types.h"
 #include "../messaging/messaging.h"
+
+
+// include drivers dat need PCI here
+// こちらがPCIを必要とするドライバーです。
+#include "../disk/drv/ide.h"
 
 #define PCI_CONFIG_ADDRESS 0xCF8
 #define PCI_CONFIG_DATA 0xCFC
@@ -30,6 +36,61 @@ uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func,
   // (offset & 2) * 8) = 0 will choose the first word of the 32-bit register
   tmp = (uint16_t)((inl(0xCFC) >> ((offset & 2) * 8)) & 0xFFFF);
   return tmp;
+}
+
+uint32_t pci_config_read_dword(uint8_t bus, uint8_t slot, uint8_t func,
+                               uint8_t offset) {
+  uint32_t address;
+  uint32_t lbus = (uint32_t)bus;
+  uint32_t lslot = (uint32_t)slot;
+  uint32_t lfunc = (uint32_t)func;
+
+  // Create configuration address as per the PCI specification
+  // Ensure the offset is 32-bit aligned by clearing the lower 2 bits
+  address = (uint32_t)((lbus << 16) | (lslot << 11) | (lfunc << 8) |
+                       (offset & 0xFC) | ((uint32_t)0x80000000));
+
+  // Write out the address to the PCI index port
+  outl(0xCF8, address);
+
+  // Read back the full 32-bit DWORD from the data port
+  return inl(0xCFC);
+}
+
+void pci_config_write_word(uint8_t bus, uint8_t slot, uint8_t func,
+                            uint8_t offset, uint16_t val) {
+  uint32_t address;
+  uint32_t lbus = (uint32_t)bus;
+  uint32_t lslot = (uint32_t)slot;
+  uint32_t lfunc = (uint32_t)func;
+
+  // Create configuration address as per the PCI specification
+  address = (uint32_t)((lbus << 16) | (lslot << 11) | (lfunc << 8) |
+                       (offset & 0xFC) | ((uint32_t)0x80000000));
+
+  // Write out the address to the PCI index port
+  outl(0xCF8, address);
+  
+  // Write the 16-bit word to the data port, offset by 0 or 2 bytes
+  outw(0xCFC + (offset & 2), val);
+}
+
+void pci_config_write_dword(uint8_t bus, uint8_t slot, uint8_t func,
+                             uint8_t offset, uint32_t val) {
+  uint32_t address;
+  uint32_t lbus = (uint32_t)bus;
+  uint32_t lslot = (uint32_t)slot;
+  uint32_t lfunc = (uint32_t)func;
+
+  // Create configuration address as per the PCI specification
+  address = (uint32_t)((lbus << 16) | (lslot << 11) | (lfunc << 8) |
+                       (offset & 0xFC) | ((uint32_t)0x80000000));
+
+  // Write out the address to the PCI index port
+  outl(0xCF8, address);
+
+  // Write the full 32-bit DWORD to the data port
+  outl(0xCFC, val);
 }
 
 void pci_check_func(uint8_t bus, uint8_t slot, uint8_t func) {
@@ -67,6 +128,7 @@ void pci_check_func(uint8_t bus, uint8_t slot, uint8_t func) {
       break;
     case 0x01:
       strcpy(reportbuf, "IDE Controller");
+      // probe IDE driver
       break;
     case 0x02:
       strcpy(reportbuf, "Floppy Disk Controller");
@@ -438,6 +500,35 @@ void pci_check_func(uint8_t bus, uint8_t slot, uint8_t func) {
   append_string(messagebuf, reportbuf, sizeof(messagebuf));
   append_string(messagebuf, "\n", sizeof(messagebuf));
   message_send_message(messagebuf);
+}
+
+// helpers for our drivers :D
+
+uint8_t pci_get_bar_type(uint8_t bus, uint8_t slot, uint8_t func, uint8_t bar_n) {
+  uint32_t bar_raw = pci_config_read_dword(bus, slot, func, 0x10 + 4 * bar_n);
+  return (bar_raw >> 1) & 0x03;
+}
+
+uint8_t pci_get_bar_is_mmio(uint8_t bus, uint8_t slot, uint8_t func, uint8_t bar_n) {
+  uint32_t bar_raw = pci_config_read_dword(bus, slot, func, 0x10 + 4 * bar_n);
+  return (bar_raw) & 1;
+}
+
+uint32_t pci_get_bar_addr(uint8_t bus, uint8_t slot, uint8_t func, uint8_t bar_n) {
+  uint32_t bar_raw = pci_config_read_dword(bus, slot, func, 0x10 + 4 * bar_n);
+  // from osdev wiki
+  if (pci_get_bar_type(bus, slot, func, bar_n) == 0)
+    return (bar_raw & 0xFFFFFFF0);
+  else
+    return (bar_raw & 0xFFFFFFFC);
+}
+
+#define PCI_CMD_BUS_MASTER (1 << 2)
+
+void pci_config_set_bus_master(uint8_t bus, uint8_t slot, uint8_t func, bool_t is_master) {
+  uint16_t command = pci_config_read_word(bus, slot, func, 0x04);
+  command = is_master ? (command | PCI_CMD_BUS_MASTER) : (command & ~PCI_CMD_BUS_MASTER);
+  pci_config_write_word(bus, slot, func, 0x04, command);
 }
 
 // check a device (ie ensure not null and check functions)
