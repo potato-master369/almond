@@ -19,7 +19,7 @@ Theres 2 VM scripts.
 * `86test.sh` -- run in 86Box. You will need to set up your own VM and modify it.
 * `vm.sh` -- QEMU KVM vm. Works without ridiculous config.
 
-Or write `disk.img` to le HDD. You need a reasonably ancient computer to use this (Must support booting Legacy BIOS (non-CSM), have an IDE controller, have a VBE-compatible GPU (that ISNT max 256-color), support the newer PCI IO config mechanism (so late Pentium I and later) and the rest is trial and error.
+Or write `disk.img` to le HDD. You need a reasonably ancient computer to use this (Must support booting Legacy BIOS (non-CSM), have an IDE controller, have a VBE-compatible GPU (that ISNT max 256-color), support the newer PCI IO config mechanism (so late Pentium I and later) and the rest is trial and error).
 
 ## Requirements
 

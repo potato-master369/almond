@@ -143,28 +143,39 @@ void bl_vga_write(const char *s, unsigned char attr) {
     if (s[i] == '\n') {
       bl_vga_data.cur_x = 0;
       ++bl_vga_data.cur_y;
+    } else if (s[i] == '\t') {
+      for (int j = 0; j < 4; ++j) {
+        if (bl_vga_data.cur_x >= columns) {
+          bl_vga_data.cur_x = 0;
+          ++bl_vga_data.cur_y;
+        }
+        // Handle vertical scroll if wrapping pushed us past the bottom
+        if (bl_vga_data.cur_y >= rows) {
+          bl_vga_scroll_up();
+          bl_vga_data.cur_y = rows - 1;
+        }
+        bl_vga_write_char(' ', bl_vga_data.cur_x, bl_vga_data.cur_y,
+                          bl_vga_data.attr);
+        ++bl_vga_data.cur_x;
+      }
+    } else if (s[i] >= 0x20 && s[i] <= 0x7E) {
+      if (bl_vga_data.cur_x >= columns) {
+        bl_vga_data.cur_x = 0;
+        ++bl_vga_data.cur_y;
+      }
       if (bl_vga_data.cur_y >= rows) {
         bl_vga_scroll_up();
         bl_vga_data.cur_y = rows - 1;
       }
-    } else if (s[i] == '\t') {
-      for (int j = 0; j < 4; ++j) {
-        bl_vga_write_char(' ', bl_vga_data.cur_x, bl_vga_data.cur_y,
-                          bl_vga_data.attr);
-        ++bl_vga_data.cur_x;
-        if (bl_vga_data.cur_x >= columns) {
-          bl_vga_scroll_up();
-          bl_vga_data.cur_x = 0;
-        }
-      }
-    } else if (s[i] >= 0x20 && s[i] <= 0x7E) {
-      if (bl_vga_data.cur_x >= columns) {
-        bl_vga_scroll_up();
-        bl_vga_data.cur_x = 0;
-      }
       bl_vga_write_char(s[i], bl_vga_data.cur_x, bl_vga_data.cur_y,
                         bl_vga_data.attr);
       ++bl_vga_data.cur_x;
+    }
+
+    // Final safety check for row overflow on explicit \n
+    if (bl_vga_data.cur_y >= rows) {
+      bl_vga_scroll_up();
+      bl_vga_data.cur_y = rows - 1;
     }
     ++i;
   }

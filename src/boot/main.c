@@ -32,11 +32,16 @@ int16_t bl_main(void) {
   // save memory map pointers
   bl_vga_init();
   bl_vga_set_x(0);
-  bl_vga_write(" ABL: quack! a keyboard available through P/S2 is required to "
-               "continue.\n",
+  bl_vga_write("   #########   ####                                          #####\n  ###\"\"\"\"\"### \"\"###                                         \"\"### \n \"###    \"###  \"###  #############    ######  ########    ####### \n \"###########  \"### \"\"###\"\"###\"\"###  ###\"\"###\"\"###\"\"###  ###\"\"### \n \"###\"\"\"\"\"###  \"###  \"### \"### \"### \"### \"### \"### \"### \"### \"### \n \"###    \"###  \"###  \"### \"### \"### \"### \"### \"### \"### \"### \"### \n #####   ##### ##### #####\"### #####\"\"######  #### #####\"\"########\n\"\"\"\"\"   \"\"\"\"\" \"\"\"\"\" \"\"\"\"\" \"\"\" \"\"\"\"\"  \"\"\"\"\"\"  \"\"\"\" \"\"\"\"\"  \"\"\"\"\"\"\"\" \n\n", 0x0E);
+  bl_vga_write("ABL (Almond BootLoader) Copyright 2026- potato-master369\n",
                0x07);
+  bl_vga_write("ABL has source available under the MIT license (alongside the Almond project) at ", 0x07);
+  bl_vga_write("http://github.com/potato-master369/almond/\n", 0x09);
+  bl_vga_write("MIT license: ", 0x07);
+  bl_vga_write("http://opensource.org/license/mit\n\n", 0x09);
+  bl_vga_write("THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.\n\n", 0x04);
 mainmenu:
-  bl_vga_write("\n\t\t0: Boot Almond\t\t\t\t\t  \t\t1: Diagnostics\n\n ABL: ",
+  bl_vga_write("0: Boot Almond\n1: Diagnostics \n\n ABL: ",
                0x07);
   unsigned char k;
   k = keyboard_read_scancode();
@@ -95,7 +100,7 @@ mainmenu:
   case 0x02:
     // diagnostics
     bl_vga_write(
-        "\n\n\t\t0: ABLR Shell \t\t\t\t\t  \t\t1: previous menu\n\n ABL: ",
+        "\n\n0: ABLR Shell\n1: previous menu\n\n ABL: ",
         0x07);
     goto diagnostics;
   default:
@@ -116,12 +121,9 @@ diagnostics:
     bl_vga_write(" ABLR: Starting shell\n", 0x07);
     disk_init();
     disk_discover();
-    bl_vga_write(" ABLR: The ABLR shell is used to do recovery tasks like "
-                 "manually editing text files or issuing hardware commands.\n",
-                 0x02);
     // shell loop
     setkeymap();
-    bl_vga_write(" ABLR Shell\n", 0x02);
+    bl_vga_write(" ABLR Shell v0.1\n", 0x02);
     for (;;) {
       bl_vga_write("> ", 0x07);
       awaitbuf();

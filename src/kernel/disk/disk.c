@@ -9,6 +9,9 @@
 // drivers
 #include "drv/ide.h"
 
+// part table
+#include "mbr.h"
+
 // these should be set in kmain
 disk_featuremask_t disk_drivermasks = {
   .ide = false
@@ -19,8 +22,22 @@ partition_info_t part_db[26]; // A:/, B:/ etc
 
 void disk_init(void) {
   message_send_message(" disk: init\n");
+  // zero out
+  for (int i = 0; i < DISK_MAX; ++i) {
+    disk_db[i].present = false;
+    disk_db[i].is_mbr = false;
+    disk_db[i].read = NULL;
+    disk_db[i].write = NULL;
+  }
+
   if (!disk_drivermasks.ide) {
     ide_init(disk_db);
+  }
+  // init MBR
+  for (int i = 0; i < DISK_MAX; ++i) {
+    if (disk_db[i].present) {
+      mbr_init_disk(&(disk_db[i]));
+    }
   }
   message_send_message(" disk: init finish\n");
 }

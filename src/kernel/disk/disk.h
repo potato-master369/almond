@@ -7,6 +7,13 @@
 #define DISK_ERR_PERM 0xFE
 #define DISK_ERR_RANGE 0xFD
 
+typedef struct {
+  uint8_t attr;
+  uint8_t type;
+  uint32_t lba_start;
+  uint32_t size; // in sectors
+} partition_metadata_t;
+
 typedef struct disk_info {
   char pretty_name[16];
   bool_t present;
@@ -14,8 +21,7 @@ typedef struct disk_info {
   uint8_t (*write)(struct disk_info *self, uint32_t lba, uint32_t n, void *from);
   uint8_t (*read)(struct disk_info *self, uint32_t lba, uint32_t n, void *to);
   bool_t is_mbr;
-  uint32_t part_starts[4];
-  uint32_t part_ends[4];
+  partition_metadata_t partition_metadata[4];
   uint32_t size; // in 512-byte sectors
 } disk_info_t;
 

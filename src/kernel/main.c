@@ -66,25 +66,7 @@ void kmain(almond_handoff_t *f) {
   message_send_message(" kmain: quack!\n");
   pci_init();
   disk_init();
-  // test
-  disk_info_t *a = disk_get_disk(disk_get_by_prettyname("ide0"));
-  message_send_message("asfpksafhkasfhj\n");
-  message_send_message(a->pretty_name);
-  uint8_t testbuf[512];
-  message_send_message("asfpksafhkasfhj\n");
-  uint8_t res = a->read(a, 0, 1, testbuf);
-  if (res == 0) {
-	  message_send_message(" test complete\n");
-	  if (testbuf[510] == 0x55 && testbuf[511] == 0xAA) {
-            message_send_message(" MBR checksum PASS!\n");
-	  }
-  }
-  else if (res == DISK_ERR_HW) {
-	  message_send_message(" test fail: HW\n"); 
-  } else {
-          message_send_message("OTHER");
-  }
   for (;;)
-    ;
+	  ;
 }
 
