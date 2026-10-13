@@ -2,7 +2,12 @@
 #include "../kernel_ports.h"
 #include "../kernel_types.h"
 #include "../messaging/messaging.h"
+// swap VGA text mode to VBE
+#include "../framebuffer/bsman.h"
+#include "../framebuffer/fb.h"
 #include "pic.h"
+extern fb_surface_t fb0;
+extern const uint8_t terminus_fon[128][16];
 
 // ISR functions
 extern void isr0(void);
@@ -81,52 +86,33 @@ void idt_install(void) {
   __asm__ __volatile__("lidt %0" : : "m"(idtp));
 }
 
-#define VGA_COLS 80
-#define VGA_ROWS 25
-#define VGA_ATTR 0x1F00u // 青色上の白色
-void idt_vga_write_char(char a, unsigned char cur_x, unsigned char cur_y,
-                        uint16_t attr) {
-  uint16_t pos = (cur_y * 80 + cur_x);
-  volatile uint16_t *where = (volatile uint16_t *)0xb8000 + pos;
-  *where = (uint16_t)a | (attr);
-  // move cursor
-  outb(0x3D4, 0x0F);
-  outb(0x3D5, (uint8_t)(pos & 0xFF));
-  outb(0x3D4, 0x0E);
-  outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
+void idt_vga_write_char(char a, uint16_t cur_x, uint16_t cur_y,
+                        uint32_t col) {
+  for (uint16_t y = 0; y < 16; ++y) {
+    uint8_t row = terminus_fon[a][y];
+    for (uint16_t x = 0; x < 8; ++x) {
+      if (!(row & (1 << x)))
+        continue;
+      fb0.write_pixel(cur_x + x, cur_y + y, col, &fb0);
+    }
+  }
 }
 
-void idt_vga_scroll_up(void) {
-  uint16_t *vga = (uint16_t *)0xb8000;
-  for (int i = 0; i < 24 * 80; ++i) {
-    vga[i] = vga[i + 80];
-  }
-  uint16_t blank = VGA_ATTR | ' ';
-  for (int i = 24 * 80; i < 25 * 80; ++i) {
-    vga[i] = blank;
-  }
-}
 uint16_t idt_vga_cur_x = 0;
 uint16_t idt_vga_cur_y = 0;
-void idt_vga_write(const char *s, uint16_t attr) {
+void idt_vga_write(const char *s) {
   int i = 0;
   while (s[i] != '\0') {
     if (s[i] == '\n') {
       idt_vga_cur_x = 0;
-      if (idt_vga_cur_y == VGA_ROWS - 1)
-        idt_vga_scroll_up();
-      else
-        ++idt_vga_cur_y;
+      idt_vga_cur_y += 16;
     } else if (s[i] >= 0x20 && s[i] <= 0x7E) {
-      if (idt_vga_cur_x >= 80) {
+      if (idt_vga_cur_x >= fb0.width - 8) {
         idt_vga_cur_x = 0;
-        if (idt_vga_cur_y == VGA_ROWS - 1)
-          idt_vga_scroll_up();
-        else
-          ++idt_vga_cur_y;
+        idt_vga_cur_y += 16;
       }
-      idt_vga_write_char(s[i], idt_vga_cur_x, idt_vga_cur_y, attr);
-      ++idt_vga_cur_x;
+      idt_vga_write_char(s[i], idt_vga_cur_x, idt_vga_cur_y, 0xffffffff);
+      idt_vga_cur_x += 8;
     }
     ++i;
   }
@@ -136,10 +122,6 @@ static volatile int in_panic = 0;
 
 void idt_c_handler(idt_registers_t *a) {
   char reportbuf[21];
-  message_send_message(" idt: IRQ 0x");
-  itoa_hex(a->int_no, reportbuf);
-  message_send_message(reportbuf);
-  message_send_message("\n");
   if (a->int_no < 0x20) {
     __asm__ __volatile__("cli");
 
@@ -150,69 +132,151 @@ void idt_c_handler(idt_registers_t *a) {
     }
     in_panic = 1;
 
-    volatile uint16_t *vga = (volatile uint16_t *)0x000B8000;
-
-    for (int i = 0; i < VGA_COLS * VGA_ROWS; i++) {
-      vga[i] = VGA_ATTR | ' ';
+    for (uint16_t x = 0; x < fb0.width; ++x) {
+      for (uint16_t y = 0; y < fb0.height; ++y) {
+        fb0.write_pixel(x, y, 0x001e7bff, &fb0);
+      }
     }
     idt_vga_cur_x = 0;
     idt_vga_cur_y = 0;
 
     char numbuf[64];
-    idt_vga_write("Almond\n", VGA_ATTR);
-    idt_vga_write("  Kernel Panic (ISR) - int 0x", VGA_ATTR);
+    idt_vga_write("Almond Kernel\n\nCompile time: " __DATE__ " " __TIME__ "\n\n");
+    idt_vga_write("  STOP - (ISR) - int 0x");
     itoa_hex(a->int_no, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("\n", VGA_ATTR);
-    idt_vga_write("\n\nRegisters:\n", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("\n");
+    idt_vga_write("\n\nRegisters:\n");
 
-    idt_vga_write("EIP: 0x", VGA_ATTR);
+    idt_vga_write("EIP: 0x");
     itoa_hex(a->eip, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("  CS: 0x", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("  CS: 0x");
     itoa_hex(a->cs, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("  FLAGS: 0x", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("  FLAGS: 0x");
     itoa_hex(a->eflags, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("\n", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("\n");
 
-    idt_vga_write("EAX: 0x", VGA_ATTR);
+    idt_vga_write("EAX: 0x");
     itoa_hex(a->eax, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("  EBX: 0x", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("  EBX: 0x");
     itoa_hex(a->ebx, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("  ECX: 0x", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("  ECX: 0x");
     itoa_hex(a->ecx, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("\n", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("\n");
 
-    idt_vga_write("EDX: 0x", VGA_ATTR);
+    idt_vga_write("EDX: 0x");
     itoa_hex(a->edx, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("  ESI: 0x", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("  ESI: 0x");
     itoa_hex(a->esi, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("  EDI: 0x", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("  EDI: 0x");
     itoa_hex(a->edi, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("\n", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("\n");
 
-    idt_vga_write("ESP: 0x", VGA_ATTR);
+    idt_vga_write("ESP: 0x");
     itoa_hex(a->esp, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("  EBP: 0x", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("  EBP: 0x");
     itoa_hex(a->ebp, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("\n", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("\n");
 
-    idt_vga_write("ERR_CODE: 0x", VGA_ATTR);
+    idt_vga_write("ERR_CODE: 0x");
     itoa_hex(a->err_code, numbuf);
-    idt_vga_write(numbuf, VGA_ATTR);
-    idt_vga_write("\n", VGA_ATTR);
-
-    idt_vga_write(" *** HALT", VGA_ATTR);
+    idt_vga_write(numbuf);
+    idt_vga_write("\n\n    The kernel has encountered an unrecoverable error upon recieving an interrupt, likely caused by a division by 0, invalid op or similarly. The kernel has been halted.\n\n Fault at: ??:?? (File cannot be discerned. Refer to EIP)\n\n");
+    switch (a->int_no) {
+    case 0:
+        // STATUS_INTEGER_DIVIDE_BY_ZERO (#DE)
+        idt_vga_write("    The kernel has attempted to perform a division by 0. (#DE). This is probably because something in your computer is too fast, or terrible programming.\n\n");
+        break;
+    case 1:
+        // STATUS_SINGLE_STEP (#DB)
+        idt_vga_write("    The kernel has performed a single instruction in single-step mode. This is not your fault. Report this to the developers.\n\n");
+        break;
+    case 2:
+        // Non-Maskable Interrupt (NMI)
+        idt_vga_write("    The kernel has encountered a high-priority hardware interrupt that could not be masked. Something is wrong. This could be a critical hardware failure, imminent power loss, or watchdog, or something else.\n\n")
+;        break;
+    case 3:
+        // STATUS_BREAKPOINT (#BP)
+        idt_vga_write("    The kernel has hit a breakpoint.\n\n");
+        break;
+    case 4:
+        // STATUS_INTEGER_OVERFLOW (#OF)
+        idt_vga_write("    The kernel has overflowed an integer somewhere. Idk\n\n");
+        break;
+    case 5:
+        // STATUS_ARRAY_BOUNDS_EXCEEDED (#BR)
+        idt_vga_write("    The kernel has accessed an array out of bounds.\n\n");
+        break;
+    case 6:
+        // STATUS_ILLEGAL_INSTRUCTION (#UD)
+        idt_vga_write("    The kernel has performed an illegal operation and has beeen shut down. (holy windows reference) Is your CPU too ancient, too new, or running random code?\n\n");
+        break;
+    case 7:
+        // STATUS_FLOAT_MULTIPLE_FAULTS (#NM)
+        idt_vga_write("    STATUS_FLOAT_MULTILE_FAULTS. Idk what that means. Search it up or something.\n\n");
+        break;
+    case 8:
+        // STATUS_DOUBLE_FAULT (#DF)
+        idt_vga_write("    This interrut handler has faulted before. How is that even possible.\n\n");
+        break;
+    case 9:
+        // Coprocessor Segment Overrun
+        idt_vga_write("    Coprocessor Segment Overrun. Ancient ass CPU problems. What are you running this on? A 386??\n\n");
+        break;
+    case 10:
+        // STATUS_INVALID_TSS (#TS)
+        idt_vga_write("    Invalid TSS state. Seeing this means the multitasking is terribly wrong.\n\n");
+        break;
+    case 11:
+        // STATUS_SEGMENT_NOT_PRESENT (#NP)
+        idt_vga_write("    Status segment not present. What does that even mean?\n\n");
+        break;
+    case 12:
+        // STATUS_STACK_OVERFLOW (#SS)
+        idt_vga_write("    Stack overflow. No, not the forum, but the kernel stack (which is tiny as hell btw) has been overrun. Crappy drivers!\n\n");
+        break;
+    case 13:
+        // STATUS_ACCESS_VIOLATION (#GP)
+        idt_vga_write("    Status access violation. Basically permission denied but the CPU now hates you.\n\n");
+        break;
+    case 14:
+        // STATUS_PAGE_FAULT (#PF)
+        idt_vga_write("    Page fault. Either VMM is tweaking or you are trying to access memory that isn't mapped or can't be read.\n\n");
+        break;
+    case 15:
+        // Reserved
+        break;
+    case 16:
+        // STATUS_FLOAT_INVALID_OPERATION (#MF)
+        idt_vga_write("    Invalid FP operation. I told you computers suck at decimal points.\n\n");
+        break;
+    case 17:
+        // STATUS_DATATYPE_MISALIGNMENT (#AC)
+        idt_vga_write("     DATATYPE MISALIGNMENT! I LOVE COMPILER PROBLEMS!!!!!!!!!!!!!!!!!!!\n\n");
+        break;
+    case 18:
+        // Machine Check Exception (#MC)
+        idt_vga_write("    Machine check exception. Contrary the name, not very fun.\n\n");
+        break;
+    case 19:
+        // STATUS_FLOAT_INEXACT_RESULT (#XF)
+        idt_vga_write("    STATUS_FLOAT_INEXACT_RESULT. Idk what that means either.\n\n");
+        break;
+    default:
+        break;
+}
+    fb0.update_fb(&fb0);
     while (1) {
       __asm__ __volatile__("hlt");
     }

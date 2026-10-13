@@ -8,6 +8,7 @@
 // macros
 #define COM1_BASE 0x3F8
 
+// 38.4kbps
 void com_set_baud(void) {
     outb(0x3FB, 0x80);
     outb(0x3F8, 0x03);

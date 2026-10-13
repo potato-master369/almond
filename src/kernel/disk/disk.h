@@ -2,6 +2,8 @@
 #define DISK_H
 #include "../kernel_types.h"
 
+#include "part/part.h"
+
 #define DISK_MAX 26
 #define DISK_ERR_HW 0xFF
 #define DISK_ERR_PERM 0xFE
@@ -31,8 +33,10 @@ typedef struct partition_info {
   uint32_t resv;
   disk_info_t *parent;
   uint8_t part_n;
-  uint8_t (*write)(struct partition_info *self, const char *filename, void *from);
-  uint8_t (*read)(struct partition_info *self, const char *filename, void *to);
+  uint8_t (*write)(almond_filehandle_t *fh, void *from, int n);
+  uint8_t (*read)(almond_filehandle_t *fh, void *to, int n);
+  uint8_t (*openstream)(almond_filehandle_t *fh, const char *filename);
+  uint8_t (*closestream)(almond_filehandle_t *fh);
 } partition_info_t;
 
 typedef struct {

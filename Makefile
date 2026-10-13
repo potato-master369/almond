@@ -6,20 +6,20 @@ OBJCOPY  = i686-elf-objcopy
 ASM      = nasm
 
 # Flags
-CFLAGS   = -ffreestanding -nostdlib -Os -Wall -Wextra -Isrc/boot -march=pentium -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fshort-enums -fno-pie -fno-pic
+CFLAGS   = -ffreestanding -nostdlib -O2 -Wall -Wextra -Isrc/boot -march=pentium -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fshort-enums -fno-pie -fno-pic -g
 ASMFLAGS = -f elf32
 
 # Directories & Objects
 OBJDIR   = obj/boot
-C_SRCS   = src/boot/bl_vga.c src/boot/main.c src/boot/drv/keyboard.c src/boot/drv/disk.c src/boot/drv/ide.c src/boot/drv/ext2.c src/boot/shell.c
+C_SRCS   = src/boot/bl_vga.c src/boot/config.c src/boot/main.c src/boot/drv/keyboard.c src/boot/drv/disk.c src/boot/drv/ide.c src/boot/drv/ext2.c src/boot/shell.c
 C_OBJS   = $(patsubst src/boot/%.c,$(OBJDIR)/%.o,$(C_SRCS))
 ASM_OBJ  = $(OBJDIR)/stub.o
 LDSCRIPT = src/boot/linker.ld
 
 OBJDIRKERN = obj/kernel
-C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c
+C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/helpers/memory.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c
 C_OBJSKERN = $(patsubst src/kernel/%.c,$(OBJDIRKERN)/%.o,$(C_SRCSKERN))
-ASM_OBJKERN = $(OBJDIRKERN)/stub.o $(OBJDIRKERN)/idt/isr.o
+ASM_OBJKERN = $(OBJDIRKERN)/stub.o $(OBJDIRKERN)/idt/isr.o $(OBJDIRKERN)/gdt.o
 LDSCRIPTKERN = src/kernel/linker.ld
 ELF_OUTPUTKERN = almond.elf
 OUTPUTKERN = almond.bin
@@ -59,7 +59,7 @@ $(OBJDIR)/stub.o: src/boot/stub.asm
 
 # Link everything into an intermediate ELF file
 $(ELF_OUTPUT): $(ASM_OBJ) $(C_OBJS) $(LDSCRIPT)
-	$(LD)  -T $(LDSCRIPT) -o $@ $(ASM_OBJ) $(C_OBJS) --entry=_start
+	$(CC) -nostdlib -T $(LDSCRIPT) -o $@ $(ASM_OBJ) $(C_OBJS) --entry=_start
 
 # Extract flat binary and pad to exactly 32256 bytes (31.5 KiB)
 $(OUTPUT): $(ELF_OUTPUT)
@@ -72,6 +72,9 @@ $(OBJDIRKERN)/stub.o: src/kernel/stub.asm
 	$(ASM) $(ASMFLAGS) $< -o $@
 
 $(OBJDIRKERN)/idt/isr.o: src/kernel/idt/isr.asm
+	$(ASM) $(ASMFLAGS) $< -o $@
+
+$(OBJDIRKERN)/gdt.o: src/kernel/gdt.asm
 	$(ASM) $(ASMFLAGS) $< -o $@
 
 $(ELF_OUTPUTKERN): $(ASM_OBJKERN) $(C_OBJSKERN) $(LDSCRIPTKERN)

@@ -8,6 +8,9 @@
 // filesystems
 #include "ext2.h"
 #include "fat32.h"
+// config
+#include "../config.h"
+extern boot_conf_t conf;
 
 // macro for null
 #define NULL (void *)0
@@ -87,10 +90,24 @@ uint8_t disk_self_discover(uint8_t disk_n) {
 uint8_t disk_autoload_kern(uint8_t disk_n) {
   for (uint8_t i = 0; i < 4;++i) {
     if (disk_info[disk_n].part_get_filesize[i] != NULL && disk_info[disk_n].part_read[i] != NULL) {
-      int32_t filesize = disk_info[disk_n].part_get_filesize[i](
-          disk_n, i, "/boot/almond.bin");
+      int32_t filesize = disk_info[disk_n].part_get_filesize[i](disk_n, i, "/boot/config.ini");
       if (filesize > 0) {
-        if (disk_info[disk_n].part_read[i](disk_n, i, "/boot/almond.bin",
+        bl_vga_write(" disk: read conf\n", 0x07);
+    	if (disk_info[disk_n].part_read[i](disk_n, i, "/boot/config.ini", (void *)0x100000, (uint32_t)filesize ) != 0x10) {
+          config_read_conf((uint32_t)filesize);
+    	} else {
+          bl_vga_write(" disk: could not read conf\n", 0x04);
+    	}
+      }
+
+      bl_vga_write("ABL is booting ", 0x0F);
+      bl_vga_write(conf.prettyname, 0x0B);
+      bl_vga_write("\n", 0x07);
+      
+      filesize = disk_info[disk_n].part_get_filesize[i](
+          disk_n, i, conf.kernpath);
+      if (filesize > 0) {
+        if (disk_info[disk_n].part_read[i](disk_n, i, conf.kernpath,
                                            (void *)0x100000,
                                            (uint32_t)filesize) != 0x10) {
           bl_vga_write(" disk: kernel autoload success\n", 0x07);

@@ -8,5 +8,5 @@ typedef struct fb_surface {
   void (*write_pixel)(uint16_t x, uint16_t y, uint32_t col, struct fb_surface *self);
   void (*update_fb)(struct fb_surface *self);
 } fb_surface_t;
-void fb_init(void);
+int fb_init(void);
 #endif

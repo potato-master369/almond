@@ -16,8 +16,12 @@ static inline char *itoa(int n, char *s) {
   return (n / 10 ? p = itoa(n / 10 > 0 ? n / 10 : -(n / 10), p) : p),
          *p++ = '0' + (n < 0 ? -(n % 10) : n % 10), *p = 0, p;
 }
-static inline void memcpy(void *dst, const void *src, uint32_t n) {
-  __builtin_memcpy(dst, src, n);
+static inline void __attribute__((always_inline)) memcpy(void *dst, const void *src, uint32_t n) {
+  uint8_t *d = (uint8_t *)dst;
+    const uint8_t *s = (const uint8_t *)src;
+    while (n--) {
+        *d++ = *s++;
+    }
 }
 
 static inline int append_string(char *buf, char *to_append,

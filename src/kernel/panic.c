@@ -68,3 +68,55 @@ void panic_print(uint32_t err, const char *pretty_name, const char *file, int li
   for (;;)
 	  ;
 }
+
+
+#define VGA_ADDRESS 0xB8000
+#define VGA_WIDTH   80
+#define VGA_HEIGHT  25
+
+static void vga_print_char(char c, int row, int col, uint8_t color) {
+    uint16_t* vga_buffer = (uint16_t*) VGA_ADDRESS;
+    const int index = row * VGA_WIDTH + col;
+    
+    vga_buffer[index] = ((uint16_t) color << 8) | (uint16_t) c;
+}
+
+static int current_col = 0;
+static int current_row = 0;
+
+static void vga_print_string(const char* str, uint8_t color) {
+
+    while (*str != 0) {
+        if (*str == '\n') {
+            current_row++;
+            current_col = 0;
+        } else {
+            vga_print_char(*str, current_row, current_col, color);
+            current_col++;
+
+            if (current_col >= VGA_WIDTH) {
+                current_col = 0;
+                current_row++;
+            }
+        }
+        str++;
+        
+        // Stop if we exceed the screen height
+        if (current_row >= VGA_HEIGHT) {
+            break;
+        }
+    }
+}
+
+void panic_vga_panic(void) {
+  for (int x = 0; x < VGA_WIDTH; ++x) {
+    for (int y = 0; y < VGA_HEIGHT; ++y) {
+      vga_print_char(' ', y, x, 0x1F);
+    }
+  }
+  vga_print_string("Almond kernel\n\nCompile time: " __DATE__ " " __TIME__ "\n\nSTOP 0xDFFFF (VGA_NOT_FOUND)\n\n", 0x1F);
+  vga_print_string("    No suitable graphics adapter was found. This text is printing on text mode. Check your video card is supported.\n", 0x1F);
+
+  for (;;)
+	  ;
+}

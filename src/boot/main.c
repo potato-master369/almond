@@ -7,6 +7,7 @@
 #define BL_PORTS_IMPL
 #include "bl_ports.h"
 #include "bl_vga.h"
+#include "config.h"
 #include "drv/disk.h"
 #include "drv/keyboard.h"
 #include "handoff_struct.h"
@@ -65,11 +66,16 @@ mainmenu:
           goto mainmenu;
         }
         almond_handoff_t f;
-        char buf[512] = "root=";
-        append_string(buf, disk_info[disk_n].pretty_name, sizeof(buf));
-        append_string(buf, ",", sizeof(buf));
-        append_uint(buf, (uint32_t)part_n, sizeof(buf));
-        bl_strcpy(f.cmdline, buf);
+        f.cmdline[0] = '\0';
+        append_string(f.cmdline, "root=", sizeof(f.cmdline));
+        append_string(f.cmdline, disk_info[disk_n].pretty_name,
+                      sizeof(f.cmdline));
+        append_string(f.cmdline, ",", sizeof(f.cmdline));
+        append_uint(f.cmdline, (uint32_t)part_n, sizeof(f.cmdline));
+        if (conf.cmdline[0] != '\0') {
+          append_string(f.cmdline, " ", sizeof(f.cmdline));
+          append_string(f.cmdline, conf.cmdline, sizeof(f.cmdline));
+        }
         f.magic[0] = 'a';
         f.magic[1] = 'l';
         f.magic[2] = 'm';
