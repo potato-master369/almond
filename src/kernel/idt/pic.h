@@ -4,4 +4,5 @@
 void pic_send_eoi(uint8_t irq);
 void pic_remap(int offset_1, int offset_2);
 void pic_disable(void);
+void pic_enable_irq(uint8_t irq);
 #endif

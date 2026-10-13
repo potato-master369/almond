@@ -14,6 +14,7 @@
 #include "mmu/vmm.h"
 #include "panic.h"
 #include "pci/pci.h"
+#include "clock/clock.h"
 
 extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
@@ -79,10 +80,13 @@ void kmain(almond_handoff_t *f) {
   fb0.update_fb(&fb0);
   if (!core_featuremask.bsman)
     bsman_init();
+  int64_t boottime = clock_init();
   message_send_message(" kmain: quack!\n");
   pci_init();
   disk_init();
-
+  char message[256] = " test: ms since boot: ";
+  append_uint(message, clock_get_ms_since_boot(), sizeof(message));
+  message_send_message(message);
   for (;;)
     ;
 }

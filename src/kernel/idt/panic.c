@@ -9,6 +9,8 @@
 extern fb_surface_t fb0;
 extern const uint8_t terminus_fon[128][16];
 
+// ISR callback registration
+typedef void (*idt_callback_t)(uint8_t);
 // ISR functions
 extern void isr0(void);
 extern void isr1(void);
@@ -46,6 +48,7 @@ extern void isr44(void);
 extern void isr45(void);
 extern void isr46(void);
 extern void isr47(void);
+idt_callback_t isr_callbacks[16];
 
 typedef struct __attribute__((packed)) {
   uint32_t ds; // Matches the 'push eax' after pushad
@@ -119,6 +122,10 @@ void idt_vga_write(const char *s) {
 }
 // cli is scammer, so put dis here so no scam
 static volatile int in_panic = 0;
+
+void idt_register_isr(idt_callback_t f, uint8_t isr_n) {
+  isr_callbacks[isr_n] = f;
+}
 
 void idt_c_handler(idt_registers_t *a) {
   char reportbuf[21];
@@ -283,7 +290,12 @@ void idt_c_handler(idt_registers_t *a) {
   }
 
   if (a->int_no >= 0x20) {
-    pic_send_eoi((uint8_t)(a->int_no - 0x20));
+    if (a->int_no >= 32 && a->int_no <= 47) {
+      if (isr_callbacks[a->int_no - 32] != NULL) {
+        isr_callbacks[a->int_no - 32](a->int_no - 32);  // fire IRQ callback
+      }                                                 // send IRQ no, back relative
+    }
+    pic_send_eoi((uint8_t)(a->int_no - 0x20)); // send EOI
   }
 }
 
@@ -292,6 +304,10 @@ void idt_init(void) {
   message_send_message(" idt: init\n");
   pic_remap(0x20, 0x28); // prevent conflicts
   pic_disable();
+  // init ISR callbacks
+  for (int i = 0; i < 16; ++i) {
+    isr_callbacks[i] = NULL;
+  }
   IDT_GATE_REG(0);
   IDT_GATE_REG(1);
   IDT_GATE_REG(2);

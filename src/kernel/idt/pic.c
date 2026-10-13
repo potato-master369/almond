@@ -1,6 +1,8 @@
 // pic.c
 // ------------------------------
 // handles 8259 PIC
+
+// note to stupids: it says not used but that's cause LSP is goofy and can't figure that intX_t arent existing without this header.
 #include "../kernel_types.h"
 #include "../kernel_ports.h"
 
@@ -48,9 +50,7 @@ void pic_remap(int offset_1, int offset_2) {
   io_wait();
   
   // make them use 8086 mode, not 8080
-  outb(PIC1_DATA, CASCADE_IRQ);
-  io_wait();
-  outb(PIC2_DATA, ICW4_8086);
+  outb(PIC1_DATA, ICW4_8086);
   io_wait();
   outb(PIC2_DATA, ICW4_8086);
   io_wait();
@@ -64,4 +64,15 @@ void pic_remap(int offset_1, int offset_2) {
 void pic_disable(void) {
   outb(PIC1_DATA, 0xff);
   outb(PIC2_DATA, 0xff);
+}
+
+void pic_enable_irq(uint8_t irq) {
+  uint16_t data_port = irq < 8 ? PIC1_DATA : PIC2_DATA;
+  uint8_t mask = inb(data_port);
+  outb(data_port, (uint8_t)(mask & ~(1u << (irq % 8))));
+
+  if (irq >= 8) {
+    mask = inb(PIC1_DATA);
+    outb(PIC1_DATA, (uint8_t)(mask & ~(1u << CASCADE_IRQ)));
+  }
 }

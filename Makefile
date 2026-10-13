@@ -17,7 +17,7 @@ ASM_OBJ  = $(OBJDIR)/stub.o
 LDSCRIPT = src/boot/linker.ld
 
 OBJDIRKERN = obj/kernel
-C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/helpers/memory.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c
+C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/helpers/memory.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c src/kernel/clock/clock.c src/kernel/clock/drv/rtc.c src/kernel/clock/drv/pit.c
 C_OBJSKERN = $(patsubst src/kernel/%.c,$(OBJDIRKERN)/%.o,$(C_SRCSKERN))
 ASM_OBJKERN = $(OBJDIRKERN)/stub.o $(OBJDIRKERN)/idt/isr.o $(OBJDIRKERN)/gdt.o
 LDSCRIPTKERN = src/kernel/linker.ld
@@ -48,6 +48,8 @@ $(OBJDIRKERN):
 	mkdir -p $(OBJDIRKERN)/disk
 	mkdir -p $(OBJDIRKERN)/disk/drv
 	mkdir -p $(OBJDIRKERN)/pci
+	mkdir -p $(OBJDIRKERN)/clock
+	mkdir -p $(OBJDIRKERN)/clock/drv
 
 # Compile C files into obj/boot/
 $(OBJDIR)/%.o: src/boot/%.c
@@ -78,7 +80,7 @@ $(OBJDIRKERN)/gdt.o: src/kernel/gdt.asm
 	$(ASM) $(ASMFLAGS) $< -o $@
 
 $(ELF_OUTPUTKERN): $(ASM_OBJKERN) $(C_OBJSKERN) $(LDSCRIPTKERN)
-	$(LD) -T $(LDSCRIPTKERN) -o $@ $(ASM_OBJKERN) $(C_OBJSKERN) --entry=_start
+	$(CC) -T $(LDSCRIPTKERN) -ffreestanding -nostartfiles -nodefaultlibs -o $@ $(ASM_OBJKERN) $(C_OBJSKERN) -lgcc --entry=_start
 
 $(OUTPUTKERN): $(ELF_OUTPUTKERN)
 	$(OBJCOPY) -O binary $(ELF_OUTPUTKERN) $(OUTPUTKERN)
