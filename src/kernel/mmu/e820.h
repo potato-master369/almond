@@ -5,7 +5,7 @@
 
 #ifndef E820_H
 #define E820_H
-#include "../kernel_types.h"
+#include "kernel_types.h"
 typedef struct __attribute__((packed)) {
   uint64_t base_addr;
   uint64_t region_len;

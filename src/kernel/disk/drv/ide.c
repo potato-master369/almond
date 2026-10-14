@@ -6,11 +6,11 @@
 // -----------------------------
 // Tried to ai slop it, didnt go well, so i restored it.
 #include "ide.h"
-#include "../../helpers/string.h"
-#include "../../kernel_ports.h"
-#include "../../kernel_types.h"
-#include "../../messaging/messaging.h"
-#include "../disk.h"
+#include "helpers/string.h"
+#include "kernel_ports.h"
+#include "kernel_types.h"
+#include "messaging/messaging.h"
+#include "disk/disk.h"
 
 // settings
 ide_featuremask_t ide_featuremask = {.dma = false};
@@ -200,8 +200,8 @@ uint8_t ide_write(disk_info_t *self, uint32_t lba, uint32_t n, void *from) {
   uint8_t slave = ide_slave_bit(drv_id);
 
   for (uint32_t sector = 0; sector < n; sector++) {
-    if (ide_read_sec(lba + sector, (void *)((char *)from + sector * 512),
-                     self->resv) != 0) {
+    if (ide_write_sec(lba + sector, (void *)((char *)from + sector * 512),
+                      self->resv) != 0) {
       return DISK_ERR_HW;
     }
   }

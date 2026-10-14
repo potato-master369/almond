@@ -1,10 +1,11 @@
 // disk.c
 // ---------------------
 // Disk subsystem for Almond
-#include "../kernel_types.h"
 #include "disk.h"
-#include "../messaging/messaging.h"
-#include "../helpers/string.h"
+
+#include "kernel_types.h"
+#include "messaging/messaging.h"
+#include "helpers/string.h"
 
 // drivers
 #include "drv/ide.h"

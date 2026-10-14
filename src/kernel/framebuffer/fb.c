@@ -3,7 +3,7 @@
 // Framebuffer model for Almond
 #include "fb.h"
 #include "drv/vbe.h"
-#include "../messaging/messaging.h"
+#include "messaging/messaging.h"
 
 fb_surface_t fb0;
 

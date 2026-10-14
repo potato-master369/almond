@@ -3,10 +3,10 @@
 // Scan PCI driver for PCI operations
 
 #include "pci.h"
-#include "../helpers/string.h"
-#include "../kernel_ports.h"
-#include "../kernel_types.h"
-#include "../messaging/messaging.h"
+#include "helpers/string.h"
+#include "kernel_ports.h"
+#include "kernel_types.h"
+#include "messaging/messaging.h"
 
 
 // include drivers dat need PCI here

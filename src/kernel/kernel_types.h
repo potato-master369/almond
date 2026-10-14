@@ -16,5 +16,8 @@ typedef uint32_t uintptr_t;
 #define TRUE 1
 #define false FALSE
 #define true TRUE
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
 #endif
 

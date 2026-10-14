@@ -1,4 +1,4 @@
-#include "../kernel_types.h"
+#include "kernel_types.h"
 
 void *memcpy(void *destination, const void *source, uint32_t count) {
   volatile uint8_t *destination_bytes = (volatile uint8_t *)destination;

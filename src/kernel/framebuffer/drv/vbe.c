@@ -2,13 +2,13 @@
 // ----------------------
 // Video Bios Extensions driver for Almond
 // Uses standard fb0 interface.
-#include "../../../boot/handoff_struct.h"
-#include "../../helpers/string.h"
-#include "../../kernel_types.h"
-#include "../../messaging/messaging.h"
-#include "../../mmu/kmalloc.h"
-#include "../../mmu/vmm.h"
-#include "../../mtrr.h"
+#include "../boot/handoff_struct.h"
+#include "helpers/string.h"
+#include "kernel_types.h"
+#include "messaging/messaging.h"
+#include "mmu/kmalloc.h"
+#include "mmu/vmm.h"
+#include "mtrr.h"
 #include "../fb.h"
 
 #define VBE_VIRT_BASE 0xC0000000u

@@ -3,9 +3,9 @@
 // Physical memory manager
 
 #include "pmm.h"
-#include "../helpers/string.h"
-#include "../kernel_types.h"
-#include "../messaging/messaging.h"
+#include "helpers/string.h"
+#include "kernel_types.h"
+#include "messaging/messaging.h"
 #include "e820.h"
 #include <iso646.h>
 uint64_t __udivmoddi4(uint64_t num, uint64_t den, uint64_t *rem) {

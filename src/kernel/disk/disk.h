@@ -33,10 +33,14 @@ typedef struct partition_info {
   uint32_t resv;
   disk_info_t *parent;
   uint8_t part_n;
-  uint8_t (*write)(almond_filehandle_t *fh, void *from, int n);
-  uint8_t (*read)(almond_filehandle_t *fh, void *to, int n);
-  uint8_t (*openstream)(almond_filehandle_t *fh, const char *filename);
-  uint8_t (*closestream)(almond_filehandle_t *fh);
+  int (*write)(almond_filehandle_t *fh, void *from, int n);
+  int (*read)(almond_filehandle_t *fh, void *to, int n);
+  int (*openstream)(almond_filehandle_t *fh, const char *filename);
+  int (*closestream)(almond_filehandle_t *fh);
+  int (*stat)(almond_stat_t *out, const char *path);
+  int (*dir_index)(almond_filehandle_t *dir, uint32_t index, almond_dirent_t *out);
+  int (*dir_count)(almond_filehandle_t *dir, uint32_t *out);
+  uint32_t size; // in bytes
 } partition_info_t;
 
 typedef struct {

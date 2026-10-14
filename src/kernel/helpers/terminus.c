@@ -1,5 +1,5 @@
 
-#include "../kernel_types.h"
+#include "kernel_types.h"
 // terminus font header
 // Terminus is licensed under OFL
 

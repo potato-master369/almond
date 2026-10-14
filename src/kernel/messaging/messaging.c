@@ -1,10 +1,10 @@
 // messaging.c
 // -----------------------------
 // kernel messaging fallback
-#include "../kernel_types.h"
+#include "kernel_types.h"
 // drivers
 #include "drv/com.h"
-#include "../framebuffer/bsman.h"
+#include "framebuffer/bsman.h"
 
 void message_send_message(const char *message);
 void message_init(void) {

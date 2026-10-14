@@ -1,0 +1,5 @@
+CompileFlags:
+  Add:
+    - --target=i686-elf
+    - -nostdlib
+    - -I/home/ebayan/vscode/almond/src/kernel

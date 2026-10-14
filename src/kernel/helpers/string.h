@@ -4,8 +4,8 @@
 
 #ifndef STRING_H
 #define STRING_H
-#include "../kernel_types.h"
-#define NULL (void *)0
+#include "kernel_types.h"
+
 static inline int strncmp(const char *s1, const char *s2, int n) {
   while (n-- && *s1 && (*s1 == *s2))
     s1++, s2++;

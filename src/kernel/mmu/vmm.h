@@ -1,6 +1,6 @@
 #ifndef VMM_H
 #define VMM_H
-#include "../kernel_types.h"
+#include "kernel_types.h"
 typedef union {
   struct __attribute__((packed)) {
     uint32_t present : 1;   // 1 = Page is in memory, 0 = Not present

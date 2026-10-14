@@ -51,8 +51,8 @@ static void part_dismember_handle_id(uint32_t id) {
 }
 
 // returns if failed
-int kopen(almond_filehandle_t *f, uint8_t drive_no, const char *path) {
-  f->id = part_gen_handle_id();
+int kopen(almond_filehandle_t *out, const char *path, const char *mode) {
+  out->id = part_gen_handle_id();
 
   return 0;
 }
@@ -62,16 +62,15 @@ int kclose(almond_filehandle_t *f) {
   return 0;
 }
 
-int kwrite(almond_filehandle_t *f, const uint8_t *from, int num_write) {
-  
+int kread(almond_filehandle_t *fh, void *buf, uint32_t count) {
+  return 0;
 }
-
-int kread(almond_filehandle_t *f, const uint8_t *to, int num_read) {
-
+int kwrite(almond_filehandle_t *fh, const void *buf, uint32_t count) {
+  return 0;
 }
 
 int kdirent_read(almond_filehandle_t *f, const int n, const uint8_t *to) {
-
+  return 0;
 }
 
 void part_init(void) {}

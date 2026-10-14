@@ -2,8 +2,8 @@
 // ---------------------
 // COM driver for kernew messawging sewvice :3
 
-#include "../../kernel_types.h"
-#include "../../kernel_ports.h"
+#include "kernel_types.h"
+#include "kernel_ports.h"
 
 // macros
 #define COM1_BASE 0x3F8

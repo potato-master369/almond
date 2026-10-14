@@ -9,8 +9,8 @@
 // Additionally, GPT would mean using heap which,
 // as of now, can't really be trusted.
 #include "disk.h"
-#include "../kernel_types.h"
-#include "../messaging/messaging.h"
+#include "kernel_types.h"
+#include "messaging/messaging.h"
 
 // constants
 extern disk_info_t disk_db[DISK_MAX]; // fxck unix

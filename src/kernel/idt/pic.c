@@ -3,8 +3,8 @@
 // handles 8259 PIC
 
 // note to stupids: it says not used but that's cause LSP is goofy and can't figure that intX_t arent existing without this header.
-#include "../kernel_types.h"
-#include "../kernel_ports.h"
+#include "kernel_types.h"
+#include "kernel_ports.h"
 
 // defs
 #define PIC1 0x20

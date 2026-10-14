@@ -6,10 +6,10 @@
 // once on boot in order to determine
 // the time of cold start.
 
-#include "../../kernel_ports.h"
-#include "../../kernel_types.h"
-#include "../../messaging/messaging.h"
-#include "../../helpers/string.h"
+#include "kernel_ports.h"
+#include "kernel_types.h"
+#include "messaging/messaging.h"
+#include "helpers/string.h"
 
 // Struct to make life easier
 typedef struct {

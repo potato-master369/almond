@@ -1,10 +1,10 @@
-#include "../helpers/string.h"
-#include "../kernel_ports.h"
-#include "../kernel_types.h"
-#include "../messaging/messaging.h"
+#include "helpers/string.h"
+#include "kernel_ports.h"
+#include "kernel_types.h"
+#include "messaging/messaging.h"
 // swap VGA text mode to VBE
-#include "../framebuffer/bsman.h"
-#include "../framebuffer/fb.h"
+#include "framebuffer/bsman.h"
+#include "framebuffer/fb.h"
 #include "pic.h"
 extern fb_surface_t fb0;
 extern const uint8_t terminus_fon[128][16];

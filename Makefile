@@ -6,8 +6,10 @@ OBJCOPY  = i686-elf-objcopy
 ASM      = nasm
 
 # Flags
-CFLAGS   = -ffreestanding -nostdlib -O2 -Wall -Wextra -Isrc/boot -march=pentium -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fshort-enums -fno-pie -fno-pic -g
+CFLAGS   = -ffreestanding -nostdlib -O2 -Wall -Wextra -march=pentium -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fshort-enums -fno-pie -fno-pic -g
 ASMFLAGS = -f elf32
+CFLAGS_BOOT = -Isrc/boot
+CFLAGS_KERNEL = -Isrc/kernel
 
 # Directories & Objects
 OBJDIR   = obj/boot
@@ -53,7 +55,7 @@ $(OBJDIRKERN):
 
 # Compile C files into obj/boot/
 $(OBJDIR)/%.o: src/boot/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CFLAGS_BOOT) -c $< -o $@
 
 # Assemble NASM stub into obj/boot/
 $(OBJDIR)/stub.o: src/boot/stub.asm
@@ -68,7 +70,7 @@ $(OUTPUT): $(ELF_OUTPUT)
 	$(OBJCOPY) -O binary --pad-to 32256 $(ELF_OUTPUT) $(OUTPUT)
 
 $(OBJDIRKERN)/%.o: src/kernel/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) -c $< -o $@
 
 $(OBJDIRKERN)/stub.o: src/kernel/stub.asm
 	$(ASM) $(ASMFLAGS) $< -o $@

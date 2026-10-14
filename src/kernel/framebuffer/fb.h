@@ -1,6 +1,6 @@
 #ifndef ALMOND_FB_H
 #define ALMOND_FB_H
-#include "../kernel_types.h"
+#include "kernel_types.h"
 
 typedef struct fb_surface {
   uint32_t width;

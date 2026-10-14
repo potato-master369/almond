@@ -1,8 +1,8 @@
 #include "kmalloc.h"
 #include "pmm.h"
 #include "vmm.h"
-#include "../helpers/string.h"
-#include "../messaging/messaging.h"
+#include "helpers/string.h"
+#include "messaging/messaging.h"
 
 #define KMALLOC_MAGIC 0x4B4D414Cu
 #define KMALLOC_LARGE_CLASS 0xFFFFu

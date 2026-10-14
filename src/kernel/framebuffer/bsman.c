@@ -4,7 +4,7 @@
 //
 // Controls bootsplash status bar
 #include "fb.h"
-#include "../kernel_types.h"
+#include "kernel_types.h"
 
 extern fb_surface_t fb0;
 extern const uint8_t terminus_fon[128][16];
