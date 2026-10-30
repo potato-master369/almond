@@ -18,6 +18,7 @@
 
 extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
+int64_t boottime;
 
 core_featuremask_t core_featuremask = {.bsman = false};
 extern void gdt_install(void);
@@ -80,7 +81,7 @@ void kmain(almond_handoff_t *f) {
   fb0.update_fb(&fb0);
   if (!core_featuremask.bsman)
     bsman_init();
-  int64_t boottime = clock_init();
+  boottime = clock_init();
   message_send_message(" kmain: quack!\n");
   pci_init();
   disk_init();
