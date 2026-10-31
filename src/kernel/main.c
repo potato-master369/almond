@@ -3,6 +3,7 @@
 #include "../boot/handoff_struct.h"
 #include "cmdline.h"
 #include "disk/disk.h"
+#include "disk/part/part.h"
 #include "framebuffer/bsman.h"
 #include "framebuffer/fb.h"
 #include "helpers/string.h"
@@ -36,6 +37,7 @@ static void intentional_panic(void) {
 
 almond_handoff_t handoff_kerncopy;
 void kmain(almond_handoff_t *f) {
+  int res;
   gdt_install();
   if (f->magic[0] != 'a' || f->magic[1] != 'l' || f->magic[2] != 'm' ||
       f->magic[3] != 'o' || f->magic[4] != 'n' || f->magic[5] != 'd') {
@@ -87,7 +89,27 @@ void kmain(almond_handoff_t *f) {
   disk_init();
   char message[256] = " test: ms since boot: ";
   append_uint(message, clock_get_ms_since_boot(), sizeof(message));
+  append_string(message, "\n", sizeof(message));
   message_send_message(message);
+  // integration test for ext2
+  message_send_message("Attempt to read C:/etc/canyouhearme.txt\n");
+  disk_info_t *rootdisk = disk_get_disk(disk_get_by_prettyname("ide0"));
+  part_mount_drive(rootdisk, 0, 'c', "ext2");
+  almond_filehandle_t test_fh;
+  almond_stat_t stat;
+  res = kstat(&stat, "c:/etc/canyouhearme.txt");
+  if (res != 0)
+	  message_send_message("ERR:stat\n");
+  res = kopen(&test_fh, "c:/etc/canyouhearme.txt", "r");
+  if (res != 0)
+	  message_send_message("ERR:open\n");
+  char *bufx = kmalloc(stat.size + 1);
+  res = kread(&test_fh, bufx, stat.size);
+  if (res != 0)
+	  message_send_message("ERR:read\n");
+  bufx[stat.size] = '\0';
+  message_send_message(bufx);
+  kclose(&test_fh);
   for (;;)
     ;
 }

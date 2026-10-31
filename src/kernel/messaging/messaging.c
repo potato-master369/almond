@@ -5,6 +5,7 @@
 // drivers
 #include "drv/com.h"
 #include "framebuffer/bsman.h"
+#include "drv/gerr.h"
 
 void message_send_message(const char *message);
 void message_init(void) {
@@ -16,6 +17,7 @@ void message_init(void) {
 void message_send_message(const char *message) {
   int i = 0;
   bsman_update(message);
+  gerr_draw_err((char*)message); // will not draw if not an error
   while (message[i] != '\0') {
           com_send_char(message[i]);
       	  ++i;

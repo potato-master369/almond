@@ -9,6 +9,8 @@
 #define DISK_PART_H
 #include "../../kernel_types.h"
 
+struct disk_info;
+
 // defines
 #define PART_MAX_OPEN 1024
 
@@ -66,6 +68,7 @@ typedef uint32_t FILE;
 #define EVFLOW -5
 #define ENOMEM -6 // used to denote when kernel runs out of alloc space or whatnot
 #define EINVAL -7
+#define ENOSPC -8 // no free blocks/inodes on the filesystem
 
 int kopen(almond_filehandle_t *out, const char *path, const char *mode); // in this case mode refers to rmods
 int kclose(almond_filehandle_t *fh);
@@ -75,4 +78,19 @@ int klseek(almond_filehandle_t *fh, uint64_t offset, int whence);
 int kstat(almond_stat_t *out, const char *path); // returns 0 on success else the errors
 int kdir_index(almond_filehandle_t *dir, uint32_t index, almond_dirent_t *out);
 int kdir_count(almond_filehandle_t *dir, uint32_t *out);
+int kdirent_read(almond_filehandle_t *f, const int n, const uint8_t *to);
+
+// Mount partition part_n of disk using the named filesystem type ("ext2"),
+// assigning the first free drive letter.  Returns 0 on success, or a negative
+// error code.
+int part_mount_g(struct disk_info *disk, char part_n, char *parttype);
+
+// Mount partition part_n of disk into a specific drive slot.  drive may be a
+// letter ('A'-'Z' / 'a'-'z') or an index (0-25).  Returns 0 on success, -1 if
+// the drive is unavailable, and -2 if mounting failed.
+int part_mount_drive(struct disk_info *disk, char part_n, char drive,
+                     char *parttype);
+
+// Initialise the partition table and probe discovered partitions for ext2.
+void part_init(void);
 #endif

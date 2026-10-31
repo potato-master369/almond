@@ -40,6 +40,10 @@ void disk_init(void) {
       mbr_init_disk(&(disk_db[i]));
     }
   }
+
+  // Initialise the partition table and mount any filesystems we recognise.
+  part_init();
+
   message_send_message(" disk: init finish\n");
 }
 
