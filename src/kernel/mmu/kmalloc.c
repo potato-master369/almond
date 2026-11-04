@@ -262,6 +262,45 @@ void kfree(void *ptr) {
   }
 }
 
+void *krealloc(void *ptr, uint32_t new_size) {
+  kmalloc_header_t *header;
+  uint32_t old_cap;
+  void *new_ptr;
+
+  if (ptr == 0) {
+    return kmalloc(new_size);
+  }
+  if (new_size == 0) {
+    kfree(ptr);
+    return 0;
+  }
+
+  header = ((kmalloc_header_t *)ptr) - 1;
+  if (header->magic != KMALLOC_MAGIC) {
+    return 0;
+  }
+
+  if (header->class_index == KMALLOC_LARGE_CLASS) {
+    old_cap = header->page_count * VMM_PAGE_SIZE - sizeof(kmalloc_header_t);
+  } else if (header->class_index < KMALLOC_CLASS_COUNT) {
+    old_cap = kmalloc_sizes[header->class_index];
+  } else {
+    return 0;
+  }
+
+  if (new_size <= old_cap) {
+    return ptr;
+  }
+
+  new_ptr = kmalloc(new_size);
+  if (new_ptr == 0) {
+    return 0;
+  }
+  memcpy(new_ptr, ptr, old_cap);
+  kfree(ptr);
+  return new_ptr;
+}
+
 void kfree_aligned(void *ptr) {
   if (ptr == 0) {
     return;
@@ -269,7 +308,6 @@ void kfree_aligned(void *ptr) {
   // Retrieve the original raw pointer stored right before the aligned address
   void *raw_ptr = *((void **)((uint32_t)(uintptr_t)ptr - sizeof(void *)));
 
-  // Pass the original pointer to your base kfree implementation
   kfree(raw_ptr);
 }
 

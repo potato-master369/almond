@@ -14,3 +14,14 @@ size_t strcspn(const char *s1, const char *s2) {
 
   return (size_t)(p - s1);
 }
+
+char *strchr(const char *s, int c) {
+  char target = (char)c;
+  do {
+    if (*s == target) {
+      return (char *)s;
+    }
+  } while (*s++);
+
+  return NULL;
+}

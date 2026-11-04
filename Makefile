@@ -19,7 +19,7 @@ ASM_OBJ  = $(OBJDIR)/stub.o
 LDSCRIPT = src/boot/linker.ld
 
 OBJDIRKERN = obj/kernel
-C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/messaging/drv/gerr.c src/kernel/messaging/drv/gvt.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/helpers/memory.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c src/kernel/clock/clock.c src/kernel/clock/drv/rtc.c src/kernel/clock/drv/pit.c src/kernel/disk/part/part.c src/kernel/disk/part/drv/ext2/ext2.c src/kernel/disk/part/drv/ext2/block.c src/kernel/disk/part/drv/ext2/inode.c src/kernel/disk/part/drv/ext2/dir.c src/kernel/disk/part/drv/ext2/file.c
+C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/messaging/drv/gerr.c src/kernel/messaging/drv/gvt.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/helpers/memory.c src/kernel/helpers/string.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c src/kernel/clock/clock.c src/kernel/clock/drv/rtc.c src/kernel/clock/drv/pit.c src/kernel/disk/part/part.c src/kernel/disk/part/drv/ext2/ext2.c src/kernel/disk/part/drv/ext2/block.c src/kernel/disk/part/drv/ext2/inode.c src/kernel/disk/part/drv/ext2/dir.c src/kernel/disk/part/drv/ext2/file.c src/kernel/cpu/cpu.c
 C_OBJSKERN = $(patsubst src/kernel/%.c,$(OBJDIRKERN)/%.o,$(C_SRCSKERN))
 ASM_OBJKERN = $(OBJDIRKERN)/stub.o $(OBJDIRKERN)/idt/isr.o $(OBJDIRKERN)/gdt.o
 LDSCRIPTKERN = src/kernel/linker.ld
@@ -55,6 +55,7 @@ $(OBJDIRKERN):
 	mkdir -p $(OBJDIRKERN)/pci
 	mkdir -p $(OBJDIRKERN)/clock
 	mkdir -p $(OBJDIRKERN)/clock/drv
+	mkdir -p $(OBJDIRKERN)/cpu
 
 # Compile C files into obj/boot/
 $(OBJDIR)/%.o: src/boot/%.c

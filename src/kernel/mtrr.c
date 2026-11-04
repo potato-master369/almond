@@ -152,7 +152,7 @@ int mtrr_init(void) {
   if (mtrr_ready)
     return 0;
 
-  almond_cpuid_req(1, &cpu);
+  almond_cpuid_req(1, 0, &cpu);
 
   if (!(cpu.edx & (1U << 5)) || !(cpu.edx & (1U << 12))) {
     message_send_message(" mtrr: el no supporto la MTRR tortilas tacos\n");

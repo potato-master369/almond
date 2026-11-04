@@ -7,5 +7,5 @@ typedef struct {
   uint32_t ecx;
   uint32_t edx;
 } almond_cpuid_t;
-void almond_cpuid_req(uint8_t leaf, almond_cpuid_t *ret);
+void almond_cpuid_req(uint32_t leaf, uint32_t subleaf, almond_cpuid_t *ret);
 #endif

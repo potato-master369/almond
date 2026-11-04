@@ -20,5 +20,6 @@ typedef unsigned int size_t;
 #ifndef NULL
 #define NULL ((void *)0)
 #endif
+#define UINT32_MAX 0xffffffff
 #endif
 

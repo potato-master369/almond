@@ -4,6 +4,7 @@
 #include "cmdline.h"
 #include "disk/disk.h"
 #include "disk/part/part.h"
+#include "helpers/rootdisk.h"
 #include "framebuffer/bsman.h"
 #include "framebuffer/fb.h"
 #include "helpers/string.h"
@@ -17,6 +18,7 @@
 #include "panic.h"
 #include "pci/pci.h"
 #include "clock/clock.h"
+#include "cpu/cpu.h"
 
 extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
@@ -45,6 +47,7 @@ static void intentional_panic(void) {
 
 almond_handoff_t handoff_kerncopy;
 void kmain(almond_handoff_t *f) {
+  int res;
   gdt_install();
   if (f->magic[0] != 'a' || f->magic[1] != 'l' || f->magic[2] != 'm' ||
       f->magic[3] != 'o' || f->magic[4] != 'n' || f->magic[5] != 'd') {
@@ -100,9 +103,39 @@ dontdrawgboot:
     bsman_init();
   boottime = clock_init();
   message_send_message(" kmain: quack!\n");
+  cpu_init();
   pci_init();
   disk_init();
   message_send_message(" kmain: will now attempt to mount rootfs.\n");
+  char prettyname[32];
+  uint32_t partition;
+  if (!rootdisk_parse(rootdisk, prettyname, sizeof(prettyname), &partition)) {
+    message_send_message("ERR:kmain: invalid param for root device!\n");
+    panic_printa(0xD07B, "ROOT_M_FAIL");
+  }
+
+  // mount le part
+  uint8_t root_d_i = disk_get_by_prettyname(prettyname);
+  if (root_d_i == 255) {
+    message_send_message("ERR:kmain: no such disk by prettyname!\n");
+    panic_printa(0xD07B, "ROOT_M_FAIL");
+  }
+  disk_info_t *root_d_p = disk_get_disk(root_d_i);
+  res = part_mount_drive(root_d_p, partition, 'c', rootfstype);
+  switch (res) {
+    case -1:
+	    message_send_message("ERR:kmain: root partition not available!\n");
+	    panic_printa(0xD07B, "ROOT_M_FAIL");
+	    // NOTREACHED
+    case -2:
+	    message_send_message("ERR:kmain: failed to mount root partition!\n");
+	    panic_printa(0xD07B, "ROOT_M_FAIL");
+	    // NOTREACHED
+    case 0:
+	    message_send_message(" kmain: mounted root successfully!\n");
+	    break;
+  }
+  
   char message[256] = " kmain: ms since boot: ";
   append_uint(message, clock_get_ms_since_boot(), sizeof(message));
   append_string(message, "\n", sizeof(message));

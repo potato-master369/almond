@@ -138,4 +138,7 @@ static inline void utoa64(uint64_t value, char *str) {
     }
     str[j] = '\0';
 }
+
+size_t strcspn(const char *s1, const char *s2);
+char *strchr(const char *s, int c);
 #endif
