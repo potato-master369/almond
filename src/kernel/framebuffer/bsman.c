@@ -13,9 +13,9 @@ bool_t bsman_active = false;
 void bsman_update(const char *msg) {
   if (!bsman_active)
 	  return;
-  int i = 0;
-  for (int y = fb0.height - 16; y < fb0.height; ++y) {
-    for (int x = 0; x < fb0.width; ++x) {
+  uint32_t i = 0;
+  for (uint32_t y = fb0.height - 16; y < fb0.height; ++y) {
+    for (uint32_t x = 0; x < fb0.width; ++x) {
       fb0.write_pixel(x, y, 0xFFFFFFFF, &fb0);
     }
   }

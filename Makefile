@@ -19,7 +19,7 @@ ASM_OBJ  = $(OBJDIR)/stub.o
 LDSCRIPT = src/boot/linker.ld
 
 OBJDIRKERN = obj/kernel
-C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/messaging/drv/gerr.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/helpers/memory.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c src/kernel/clock/clock.c src/kernel/clock/drv/rtc.c src/kernel/clock/drv/pit.c src/kernel/disk/part/part.c src/kernel/disk/part/drv/ext2/ext2.c src/kernel/disk/part/drv/ext2/block.c src/kernel/disk/part/drv/ext2/inode.c src/kernel/disk/part/drv/ext2/dir.c src/kernel/disk/part/drv/ext2/file.c
+C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/messaging/drv/gerr.c src/kernel/messaging/drv/gvt.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/helpers/memory.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c src/kernel/clock/clock.c src/kernel/clock/drv/rtc.c src/kernel/clock/drv/pit.c src/kernel/disk/part/part.c src/kernel/disk/part/drv/ext2/ext2.c src/kernel/disk/part/drv/ext2/block.c src/kernel/disk/part/drv/ext2/inode.c src/kernel/disk/part/drv/ext2/dir.c src/kernel/disk/part/drv/ext2/file.c
 C_OBJSKERN = $(patsubst src/kernel/%.c,$(OBJDIRKERN)/%.o,$(C_SRCSKERN))
 ASM_OBJKERN = $(OBJDIRKERN)/stub.o $(OBJDIRKERN)/idt/isr.o $(OBJDIRKERN)/gdt.o
 LDSCRIPTKERN = src/kernel/linker.ld
@@ -35,6 +35,7 @@ all: $(OBJDIR) $(OUTPUT) $(OBJDIRKERN) $(OUTPUTKERN)
 
 # Ensure object directory exists
 $(OBJDIR):
+	@echo "Making objdir"
 	mkdir -p $(OBJDIR)
 	mkdir -p $(OBJDIR)/drv
 
@@ -57,37 +58,47 @@ $(OBJDIRKERN):
 
 # Compile C files into obj/boot/
 $(OBJDIR)/%.o: src/boot/%.c
-	$(CC) $(CFLAGS) $(CFLAGS_BOOT) -c $< -o $@
+	@echo "CC $<"
+	@$(CC) $(CFLAGS) $(CFLAGS_BOOT) -c $< -o $@
 
 # Assemble NASM stub into obj/boot/
 $(OBJDIR)/stub.o: src/boot/stub.asm
-	$(ASM) $(ASMFLAGS) $< -o $@
+	@echo "ASM $<"
+	@$(ASM) $(ASMFLAGS) $< -o $@
 
 # Link everything into an intermediate ELF file
 $(ELF_OUTPUT): $(ASM_OBJ) $(C_OBJS) $(LDSCRIPT)
-	$(CC) -nostdlib -T $(LDSCRIPT) -o $@ $(ASM_OBJ) $(C_OBJS) --entry=_start
+	@echo "CC L $@"
+	@$(CC) -nostdlib -T $(LDSCRIPT) -o $@ $(ASM_OBJ) $(C_OBJS) --entry=_start
 
 # Extract flat binary and pad to exactly 32256 bytes (31.5 KiB)
 $(OUTPUT): $(ELF_OUTPUT)
-	$(OBJCOPY) -O binary --pad-to 32256 $(ELF_OUTPUT) $(OUTPUT)
+	@echo "OBJCOPY $(OUTPUT)"
+	@$(OBJCOPY) -O binary --pad-to 32256 $(ELF_OUTPUT) $(OUTPUT)
 
 $(OBJDIRKERN)/%.o: src/kernel/%.c
-	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) -c $< -o $@
+	@echo "CC $<"
+	@$(CC) $(CFLAGS) $(CFLAGS_KERNEL) -c $< -o $@
 
 $(OBJDIRKERN)/stub.o: src/kernel/stub.asm
-	$(ASM) $(ASMFLAGS) $< -o $@
+	@echo "ASM $<"
+	@$(ASM) $(ASMFLAGS) $< -o $@
 
 $(OBJDIRKERN)/idt/isr.o: src/kernel/idt/isr.asm
-	$(ASM) $(ASMFLAGS) $< -o $@
+	@echo "ASM $<"
+	@$(ASM) $(ASMFLAGS) $< -o $@
 
 $(OBJDIRKERN)/gdt.o: src/kernel/gdt.asm
-	$(ASM) $(ASMFLAGS) $< -o $@
+	@echo "ASM $<"
+	@$(ASM) $(ASMFLAGS) $< -o $@
 
 $(ELF_OUTPUTKERN): $(ASM_OBJKERN) $(C_OBJSKERN) $(LDSCRIPTKERN)
-	$(CC) -T $(LDSCRIPTKERN) -ffreestanding -nostartfiles -nodefaultlibs -o $@ $(ASM_OBJKERN) $(C_OBJSKERN) -lgcc --entry=_start
+	@echo "CC L $@"
+	@$(CC) -T $(LDSCRIPTKERN) -ffreestanding -nostartfiles -nodefaultlibs -o $@ $(ASM_OBJKERN) $(C_OBJSKERN) -lgcc --entry=_start
 
 $(OUTPUTKERN): $(ELF_OUTPUTKERN)
-	$(OBJCOPY) -O binary $(ELF_OUTPUTKERN) $(OUTPUTKERN)
+	@echo "OBJCOPY $@"
+	@$(OBJCOPY) -O binary $(ELF_OUTPUTKERN) $(OUTPUTKERN)
 
 clean:
 	rm -rf obj $(ELF_OUTPUT) $(OUTPUT) $(ELF_OUTPUTKERN) $(OUTPUTKERN) $(OBJDIR) $(OBJDIRKERN)

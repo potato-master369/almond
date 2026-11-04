@@ -128,7 +128,6 @@ void idt_register_isr(idt_callback_t f, uint8_t isr_n) {
 }
 
 void idt_c_handler(idt_registers_t *a) {
-  char reportbuf[21];
   if (a->int_no < 0x20) {
     __asm__ __volatile__("cli");
 

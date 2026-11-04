@@ -9,6 +9,7 @@
 #include "helpers/string.h"
 #include "idt/idt.h"
 #include "messaging/messaging.h"
+#include "messaging/drv/gvt.h"
 #include "mmu/e820.h"
 #include "mmu/kmalloc.h"
 #include "mmu/pmm.h"
@@ -20,8 +21,15 @@
 extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
 int64_t boottime;
+extern uint16_t checkmask;
 
-core_featuremask_t core_featuremask = {.bsman = false};
+core_featuremask_t core_featuremask = {
+	.bsman = false,
+	.gvt = true
+};
+
+char rootdisk[64];
+char rootfstype[64];
 extern void gdt_install(void);
 /* // uncomment to test the BSOD!
 static void intentional_panic(void) {
@@ -37,7 +45,6 @@ static void intentional_panic(void) {
 
 almond_handoff_t handoff_kerncopy;
 void kmain(almond_handoff_t *f) {
-  int res;
   gdt_install();
   if (f->magic[0] != 'a' || f->magic[1] != 'l' || f->magic[2] != 'm' ||
       f->magic[3] != 'o' || f->magic[4] != 'n' || f->magic[5] != 'd') {
@@ -64,6 +71,13 @@ void kmain(almond_handoff_t *f) {
     vmm_map_phys_to_virt(vmm_current_pagemap(), 0x000B8000u, 0x000B8000u);
     panic_vga_panic();
   }
+  if (checkmask != 3) {
+    panic_printa(0xd07b, "ROOT_M_FAIL");
+  }
+  if (!core_featuremask.gvt) {
+    gvt_init();
+    goto dontdrawgboot;
+  }
   for (uint32_t x = 0; x < fb0.width; ++x) {
     for (uint32_t y = 0; y < fb0.height; ++y) {
       fb0.write_pixel(x, y, 0x4a4a9900, &fb0);
@@ -81,35 +95,18 @@ void kmain(almond_handoff_t *f) {
     }
   }
   fb0.update_fb(&fb0);
+dontdrawgboot:
   if (!core_featuremask.bsman)
     bsman_init();
   boottime = clock_init();
   message_send_message(" kmain: quack!\n");
   pci_init();
   disk_init();
-  char message[256] = " test: ms since boot: ";
+  message_send_message(" kmain: will now attempt to mount rootfs.\n");
+  char message[256] = " kmain: ms since boot: ";
   append_uint(message, clock_get_ms_since_boot(), sizeof(message));
   append_string(message, "\n", sizeof(message));
   message_send_message(message);
-  // integration test for ext2
-  message_send_message("Attempt to read C:/etc/canyouhearme.txt\n");
-  disk_info_t *rootdisk = disk_get_disk(disk_get_by_prettyname("ide0"));
-  part_mount_drive(rootdisk, 0, 'c', "ext2");
-  almond_filehandle_t test_fh;
-  almond_stat_t stat;
-  res = kstat(&stat, "c:/etc/canyouhearme.txt");
-  if (res != 0)
-	  message_send_message("ERR:stat\n");
-  res = kopen(&test_fh, "c:/etc/canyouhearme.txt", "r");
-  if (res != 0)
-	  message_send_message("ERR:open\n");
-  char *bufx = kmalloc(stat.size + 1);
-  res = kread(&test_fh, bufx, stat.size);
-  if (res != 0)
-	  message_send_message("ERR:read\n");
-  bufx[stat.size] = '\0';
-  message_send_message(bufx);
-  kclose(&test_fh);
   for (;;)
     ;
 }

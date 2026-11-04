@@ -113,6 +113,10 @@ static inline void itoa_hex(uint32_t val, char *numbuf) {
   numbuf[i] = '\0';
 }
 
+void *memmove(void *dest, const void *src, size_t n);
+
+void *memset(void *ptr, int value, size_t num);
+
 static inline void utoa64(uint64_t value, char *str) {
     char temp[21];
     int i = 0;

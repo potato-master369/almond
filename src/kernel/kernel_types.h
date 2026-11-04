@@ -11,6 +11,7 @@ typedef unsigned char bool_t;
 typedef long long int64_t;
 typedef unsigned long long uint64_t;
 typedef uint32_t uintptr_t;
+typedef unsigned int size_t;
 // boolean values
 #define FALSE 0
 #define TRUE 1

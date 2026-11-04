@@ -139,10 +139,10 @@ uint8_t ide_read(disk_info_t *self, uint32_t lba, uint32_t n, void *to) {
   if (lba > self->size || n > self->size - lba)
     return DISK_ERR_RANGE;
 
-  uint16_t *buf16 = (uint16_t *)to;
+  //uint16_t *buf16 = (uint16_t *)to;
   uint8_t drv_id = self->resv & 0xFF;
-  uint16_t io = ide_io_base(drv_id);
-  uint8_t slave = ide_slave_bit(drv_id);
+  //uint16_t io = ide_io_base(drv_id);
+  //uint8_t slave = ide_slave_bit(drv_id);
 
   for (uint32_t sector = 0; sector < n; sector++) {
     if (ide_read_sec(lba + sector, (void *)((char *)to + sector * 512),
@@ -194,10 +194,10 @@ uint8_t ide_write_sec(uint32_t sector_offset, void *buf, uint8_t drv_id) {
 uint8_t ide_write(disk_info_t *self, uint32_t lba, uint32_t n, void *from) {
   if (lba > self->size || n > self->size - lba)
     return DISK_ERR_RANGE;
-  uint16_t *buf16 = (uint16_t *)from;
+  //uint16_t *buf16 = (uint16_t *)from;
   uint8_t drv_id = self->resv & 0xFF;
-  uint16_t io = ide_io_base(drv_id);
-  uint8_t slave = ide_slave_bit(drv_id);
+  //uint16_t io = ide_io_base(drv_id);
+  //uint8_t slave = ide_slave_bit(drv_id);
 
   for (uint32_t sector = 0; sector < n; sector++) {
     if (ide_write_sec(lba + sector, (void *)((char *)from + sector * 512),
