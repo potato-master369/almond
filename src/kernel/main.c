@@ -19,6 +19,7 @@
 #include "pci/pci.h"
 #include "clock/clock.h"
 #include "cpu/cpu.h"
+#include "input/input.h"
 
 extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
@@ -135,7 +136,9 @@ dontdrawgboot:
 	    message_send_message(" kmain: mounted root successfully!\n");
 	    break;
   }
-  
+
+  // input setup
+  input_init();
   char message[256] = " kmain: ms since boot: ";
   append_uint(message, clock_get_ms_since_boot(), sizeof(message));
   append_string(message, "\n", sizeof(message));
