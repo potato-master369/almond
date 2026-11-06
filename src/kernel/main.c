@@ -20,6 +20,7 @@
 #include "clock/clock.h"
 #include "cpu/cpu.h"
 #include "input/input.h"
+#include "input/keymaps/keymap.h"
 
 extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
@@ -139,6 +140,7 @@ dontdrawgboot:
 
   // input setup
   input_init();
+  keymap_init();
   char message[256] = " kmain: ms since boot: ";
   append_uint(message, clock_get_ms_since_boot(), sizeof(message));
   append_string(message, "\n", sizeof(message));
