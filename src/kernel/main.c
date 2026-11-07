@@ -21,6 +21,7 @@
 #include "cpu/cpu.h"
 #include "input/input.h"
 #include "input/keymaps/keymap.h"
+#include "tty/vt100.h"
 
 extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
@@ -145,6 +146,11 @@ dontdrawgboot:
   append_uint(message, clock_get_ms_since_boot(), sizeof(message));
   append_string(message, "\n", sizeof(message));
   message_send_message(message);
+
+  gvt_disable();
+  bsman_exit();
+  vt100_init();
+  vt100_write_stream("\x1b[34;43mHello\x1b[0m \x1b[48;5;57mmorning blue\x1b[0m\n");
   for (;;)
     ;
 }

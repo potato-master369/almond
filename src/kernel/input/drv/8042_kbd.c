@@ -14,22 +14,23 @@
 
 // ＊P/S2 is Personal system 2, not PS2 you shitheads
 
-#define PS2_DATA_PORT 0x60
-#define PS2_STATUS_PORT 0x64
-#define PS2_CMD_PORT 0x64
+#define PS2_DATA_PORT     0x60
+#define PS2_STATUS_PORT   0x64
+#define PS2_CMD_PORT      0x64
 
-#define CMD_READ_CONFIG 0x20
-#define CMD_SELF_TEST 0xAA
+#define CMD_READ_CONFIG   0x20
+#define CMD_SELF_TEST     0xAA
 #define CMD_DISABLE_PORT1 0xAD
-#define CMD_ENABLE_PORT1 0xAE
-#define CMD_WRITE_CONFIG 0x60
+#define CMD_ENABLE_PORT1  0xAE
+#define CMD_WRITE_CONFIG  0x60
+#define CMD_SET_LED       0xED
 
-#define KBD_SET_SCANCODE 0xF0
-#define KBD_ENABLE 0xF4
-#define KBD_ACK 0xFA
-#define KBD_RESEND 0xFE
+#define KBD_SET_SCANCODE  0xF0
+#define KBD_ENABLE        0xF4
+#define KBD_ACK           0xFA
+#define KBD_RESEND        0xFE
 
-#define TEST_SUCCESS 0x55
+#define TEST_SUCCESS      0x55
 
 static struct {
   uint8_t extended;
@@ -435,6 +436,11 @@ void kbd_8042_isr_callback(uint8_t isr_n) {
   keyboard_queue_keystroke(hid, pressed);
 
   // EOI handled by idt.
+}
+
+void kbd_8042_set_light(bool_t scrlock, bool_t numlock, bool_t capslock) {
+  ps2_keyboard_command(CMD_SET_LED);
+  ps2_data_write((capslock << 2) | (numlock << 1) | scrlock);
 }
 
 static bool_t probe_8042_no_acpi(void) {

@@ -54,3 +54,7 @@ void gvt_init(void) {
   gvt_context.gvt_enabled = true;
   gvt_send_message("Almond Graphical Terminal (Almond Kernel)\nCompile time: " __DATE__ " " __TIME__ "\nSome messages were sent before the framebuffer initialization. They were only reported over COM1.\n================================================================================\n\n");
 }
+
+void gvt_disable(void) {
+  gvt_context.gvt_enabled = false;
+}
