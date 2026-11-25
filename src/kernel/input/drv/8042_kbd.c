@@ -8,7 +8,6 @@
 #include "input/input.h"
 #include "kernel_ports.h"
 #include "kernel_types.h"
-#include "helpers/string.h"
 #include "messaging/messaging.h"
 
 // keyboard
@@ -375,6 +374,21 @@ static inline void irq_restore(uint32_t flags) {
 }
 
 static inline void io_delay() { inb(0x80); }
+
+// Throw away anything that is already sitting in the controller's output
+// buffer. The bootloader leaves scancodes (usually the break code of the key
+// the user pressed to boot) queued here, and they will otherwise be mistaken
+// for command responses.
+static void ps2_flush_output(void) {
+  uint32_t timeout = 100000;
+
+  while ((inb(PS2_STATUS_PORT) & 0x01) && timeout > 0) {
+    inb(PS2_DATA_PORT);
+    io_delay();
+    timeout--;
+  }
+}
+
 static bool_t ps2_wait_input_clear(void) {
   uint32_t timeout = 100000;
 
@@ -419,22 +433,36 @@ static bool_t ps2_data_write(uint8_t value) {
 
 static bool_t ps2_keyboard_command(uint8_t command) {
   for (int retry = 0; retry < 3; retry++) {
+    // Drop stale scancodes before asking the keyboard anything.
+    ps2_flush_output();
+
     if (!ps2_data_write(command))
       return false;
 
-    if (!ps2_wait_output_full())
-      return false;
+    // Do not assume the very next byte is the ACK. If the user was still
+    // holding the key they used to boot, its break code can arrive while we
+    // are waiting here. Skip anything that is not an ACK/RESEND instead of
+    // failing initialization on a perfectly valid scancode.
+    bool_t resend = false;
+    for (uint32_t timeout = 100000; timeout > 0; timeout--) {
+      if (!(inb(PS2_STATUS_PORT) & 0x01)) {
+        io_delay();
+        continue;
+      }
 
-    uint8_t response = inb(PS2_DATA_PORT);
+      uint8_t response = inb(PS2_DATA_PORT);
 
-    if (response == KBD_ACK)
-      return true;
+      if (response == KBD_ACK)
+        return true;
 
-    if (response != KBD_RESEND) {
-      char msgbuf[50] = "ERR:unexpected PS/2 response ";
-      append_uint(msgbuf, response, sizeof(msgbuf));
-      append_string(msgbuf, "\n", sizeof(msgbuf));
-      message_send_message(msgbuf);
+      if (response == KBD_RESEND) {
+        resend = true;
+        break;
+      }
+    }
+
+    if (!resend) {
+      message_send_message("ERR:PS/2 timeout waiting for ACK\n");
       return false;
     }
   }
@@ -533,11 +561,16 @@ int kbd_8042_init(void) {
   uint32_t flags = irq_save();
   message_send_message(" 8042_kbd: init\n");
   if (!probe_8042_no_acpi())
-    return 1;
+    goto fail;
   message_send_message(" 8042_kbd: interrupts will be temporarily halted...\n");
   __asm__ volatile("cli"); // interrupts go bye bye
   if (!ps2_controller_write(CMD_DISABLE_PORT1))
     goto fail;
+
+  // With port 1 disabled nothing new should arrive from the keyboard. Clear
+  // out any byte that was already in flight before asking for the config
+  // byte, otherwise a scancode can be read as the controller config.
+  ps2_flush_output();
 
   if (!ps2_controller_write(CMD_READ_CONFIG))
     goto fail;
@@ -561,17 +594,21 @@ int kbd_8042_init(void) {
     goto fail;
   if (!ps2_keyboard_command(KBD_ENABLE))
     goto fail;
-  while (inb(PS2_STATUS_PORT) & 0x01)
-    inb(PS2_DATA_PORT); // discard the rest
+  ps2_flush_output(); // discard the rest
   config &= ~(1 << 4);
   config |= (1 << 0);
   if (!ps2_controller_write(CMD_WRITE_CONFIG))
     goto fail;
   if (!ps2_data_write(config))
     goto fail;
+  idt_register_isr(kbd_8042_isr_callback, 1);
   uint8_t mask = inb(0x21);
   outb(0x21, mask & ~(1 << 1)); // enable IRQ1
-  idt_register_isr(kbd_8042_isr_callback, 1);
+  // The 8042 only raises an edge when its output buffer goes from empty to
+  // full. If a scancode arrived while IRQ1 was masked, that edge is lost and
+  // the keyboard appears dead. Unmask first, then drain the stale byte while
+  // interrupts are still disabled so the next real keypress gets an edge.
+  ps2_flush_output();
   irq_restore(flags);
   __asm__ volatile("sti");
   pic_enable_irq(0);
