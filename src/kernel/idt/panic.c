@@ -258,7 +258,11 @@ void idt_c_handler(idt_registers_t *a) {
         break;
     case 14:
         // STATUS_PAGE_FAULT (#PF)
-        idt_vga_write("    Page fault. Either VMM is tweaking or you are trying to access memory that isn't mapped or can't be read.\n\n");
+        idt_vga_write("    Page fault. Either VMM is tweaking or you are trying to access memory that isn't mapped or can't be read.\n\nCR2: ");
+	uint32_t cr2;
+__asm__ volatile ("mov %%cr2, %0" : "=r"(cr2));
+	itoa_hex(cr2, numbuf);
+	idt_vga_write(numbuf);
         break;
     case 15:
         // Reserved

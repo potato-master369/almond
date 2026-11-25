@@ -23,6 +23,7 @@
 #include "input/input.h"
 #include "input/keymaps/keymap.h"
 #include "tty/vt100.h"
+#include "user/sched.h"
 
 extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
@@ -154,6 +155,7 @@ dontdrawgboot:
   bsman_exit();
   vt100_init();
   vt100_write_stream("\x1b[34;43mHello\x1b[0m \x1b[48;5;57mmorning blue\x1b[0m\n");
+  sched_init();
   for (;;)
     ;
 }
