@@ -1,6 +1,7 @@
 // kernel main.c
 // --------------------------
 #include "../boot/handoff_struct.h"
+#include "clock/rng.h"
 #include "cmdline.h"
 #include "disk/disk.h"
 #include "disk/part/part.h"
@@ -27,6 +28,7 @@ extern fb_surface_t fb0;
 extern const uint32_t bootsplash_img[];
 int64_t boottime;
 extern uint16_t checkmask;
+extern almond_ktime_t ctime;
 
 core_featuremask_t core_featuremask = {
 	.bsman = false,
@@ -58,12 +60,12 @@ void kmain(almond_handoff_t *f) {
     panic_printa(0xD001, "INVALID_MAGIC");
   }
   handoff_kerncopy = *f;
+  cmdline_parse_cmdline(handoff_kerncopy.cmdline);
   message_init();
   idt_init();
   message_send_message(" kmain: cmdline: ");
   message_send_message(handoff_kerncopy.cmdline);
   message_send_message("\n");
-  cmdline_parse_cmdline(handoff_kerncopy.cmdline);
   char buf[64];
   itoa((int)(handoff_kerncopy.mmap_ptr), buf);
   message_send_message(" kmain: mmap pointer at ");
@@ -107,6 +109,7 @@ dontdrawgboot:
   boottime = clock_init();
   message_send_message(" kmain: quack!\n");
   cpu_init();
+  rng_seed(ctime); // seed on current time
   pci_init();
   disk_init();
   message_send_message(" kmain: will now attempt to mount rootfs.\n");

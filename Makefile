@@ -6,7 +6,7 @@ OBJCOPY  = i686-elf-objcopy
 ASM      = nasm
 
 # Flags
-CFLAGS   = -ffreestanding -nostdlib -O2 -Wall -Wextra -march=pentium -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fshort-enums -fno-pie -fno-pic -g
+CFLAGS   = -ffreestanding -nostdlib -O2 -Wall -Wextra -march=pentium -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fshort-enums -fno-pie -fno-pic
 ASMFLAGS = -f elf32
 CFLAGS_BOOT = -Isrc/boot
 CFLAGS_KERNEL = -Isrc/kernel
@@ -22,7 +22,7 @@ OBJDIRKERN = obj/kernel/
 KEYMAPS = $(OBJDIRKERN)/keymaps/iso.akm \
           $(OBJDIRKERN)/keymaps/us.akm \
           $(OBJDIRKERN)/keymaps/jis.akm
-C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/messaging/drv/gerr.c src/kernel/messaging/drv/gvt.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/helpers/memory.c src/kernel/helpers/string.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c src/kernel/clock/clock.c src/kernel/clock/drv/rtc.c src/kernel/clock/drv/pit.c src/kernel/disk/part/part.c src/kernel/disk/part/drv/ext2/ext2.c src/kernel/disk/part/drv/ext2/block.c src/kernel/disk/part/drv/ext2/inode.c src/kernel/disk/part/drv/ext2/dir.c src/kernel/disk/part/drv/ext2/file.c src/kernel/cpu/cpu.c src/kernel/input/input.c src/kernel/input/drv/keyboard.c src/kernel/input/drv/8042_kbd.c src/kernel/input/keymaps/keymap.c src/kernel/input/keymaps/us.c src/kernel/tty/vt100.c
+C_SRCSKERN = src/kernel/main.c src/kernel/messaging/messaging.c src/kernel/messaging/drv/com.c src/kernel/messaging/drv/gerr.c src/kernel/messaging/drv/gvt.c src/kernel/mmu/pmm.c src/kernel/mmu/vmm.c src/kernel/mmu/kmalloc.c src/kernel/idt/panic.c src/kernel/idt/pic.c src/kernel/framebuffer/fb.c src/kernel/framebuffer/drv/vbe.c src/kernel/bootsplash.c src/kernel/helpers/terminus.c src/kernel/helpers/memory.c src/kernel/helpers/string.c src/kernel/framebuffer/bsman.c src/kernel/panic.c src/kernel/disk/disk.c src/kernel/disk/drv/ide.c src/kernel/cmdline.c src/kernel/pci/pci.c src/kernel/mtrr.c src/kernel/cpuid_c.c src/kernel/disk/mbr.c src/kernel/clock/clock.c src/kernel/clock/drv/rtc.c src/kernel/clock/drv/pit.c src/kernel/clock/rng.c src/kernel/disk/part/part.c src/kernel/disk/part/drv/ext2/ext2.c src/kernel/disk/part/drv/ext2/block.c src/kernel/disk/part/drv/ext2/inode.c src/kernel/disk/part/drv/ext2/dir.c src/kernel/disk/part/drv/ext2/file.c src/kernel/cpu/cpu.c src/kernel/input/input.c src/kernel/input/drv/keyboard.c src/kernel/input/drv/8042_kbd.c src/kernel/input/keymaps/keymap.c src/kernel/input/keymaps/us.c src/kernel/tty/vt100.c
 C_OBJSKERN = $(patsubst src/kernel/%.c,$(OBJDIRKERN)/%.o,$(C_SRCSKERN))
 ASM_OBJKERN = $(OBJDIRKERN)/stub.o $(OBJDIRKERN)/idt/isr.o $(OBJDIRKERN)/gdt.o
 LDSCRIPTKERN = src/kernel/linker.ld

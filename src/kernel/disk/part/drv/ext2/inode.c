@@ -20,13 +20,17 @@ int ext2_read_inode(ext2_context_t *ctx, uint32_t inode_n, ext2_inode_t *out) {
   int rc;
 
   if (ctx == NULL || out == NULL || inode_n == 0 ||
-      inode_n > ctx->superblock->main.num_inodes)
+      inode_n > ctx->superblock->main.num_inodes) {
+    ext2_log_uint("read_inode: invalid inode ", inode_n);
     return EINVAL;
+  }
 
   group = (inode_n - 1) / ctx->inodes_per_group;
   index = (inode_n - 1) % ctx->inodes_per_group;
-  if (group >= ctx->group_count)
+  if (group >= ctx->group_count) {
+    ext2_log_uint("read_inode: group out of range, group ", group);
     return EIO;
+  }
 
   rc = ext2_read_bgd(ctx, group, &bgd);
   if (rc != 0)
@@ -66,13 +70,17 @@ int ext2_write_inode(ext2_context_t *ctx, uint32_t inode_n,
   int rc;
 
   if (ctx == NULL || in == NULL || inode_n == 0 ||
-      inode_n > ctx->superblock->main.num_inodes)
+      inode_n > ctx->superblock->main.num_inodes) {
+    ext2_log_uint("write_inode: invalid inode ", inode_n);
     return EINVAL;
+  }
 
   group = (inode_n - 1) / ctx->inodes_per_group;
   index = (inode_n - 1) % ctx->inodes_per_group;
-  if (group >= ctx->group_count)
+  if (group >= ctx->group_count) {
+    ext2_log_uint("write_inode: group out of range, group ", group);
     return EIO;
+  }
 
   rc = ext2_read_bgd(ctx, group, &bgd);
   if (rc != 0)
@@ -92,8 +100,14 @@ int ext2_write_inode(ext2_context_t *ctx, uint32_t inode_n,
     copy_size = sizeof(ext2_inode_t);
   memcpy(ctx->block_buf + offset_in_block, in, copy_size);
 
-  return ext2_write_block(ctx, bgd.inode_table_starting_addr + block_offset,
-                          ctx->block_buf);
+  rc = ext2_write_block(ctx, bgd.inode_table_starting_addr + block_offset,
+                        ctx->block_buf);
+  if (rc != 0) {
+    ext2_log_uint("write_inode: failed for inode ", inode_n);
+    return rc;
+  }
+  ext2_log_uint("write_inode: updated inode ", inode_n);
+  return 0;
 }
 
 uint64_t ext2_inode_size(const ext2_inode_t *inode) {
@@ -123,13 +137,17 @@ static int ext2_readlink(ext2_context_t *ctx, const ext2_inode_t *inode,
   int rc;
 
   size64 = ext2_inode_size(inode);
-  if (size64 > 4096)
+  if (size64 > 4096) {
+    ext2_log_uint("readlink: target too long, size ", (uint32_t)size64);
     return EINVAL; // an ext2 symlink target longer than this is nonsense
+  }
   size = (uint32_t)size64;
 
   buf = (char *)kmalloc(size + 1);
-  if (buf == NULL)
+  if (buf == NULL) {
+    ext2_log("readlink: kmalloc failed\n");
     return ENOMEM;
+  }
 
   if (inode->num_sectors == 0 && size <= EXT2_MAX_SYMLINK_LEN) {
     memcpy(buf, &inode->dbp0, size);
@@ -137,6 +155,7 @@ static int ext2_readlink(ext2_context_t *ctx, const ext2_inode_t *inode,
   } else {
     rc = ext2_read_file(ctx, (ext2_inode_t *)inode, 0, buf, size);
     if (rc < 0) {
+      ext2_log_uint("readlink: target read failed, error ", (uint32_t)rc);
       kfree(buf);
       return rc;
     }
@@ -157,10 +176,14 @@ static int ext2_resolve_from(ext2_context_t *ctx, uint32_t start_ino,
   const char *p;
   int rc;
 
-  if (ctx == NULL || path == NULL || out_ino == NULL || out_inode == NULL)
+  if (ctx == NULL || path == NULL || out_ino == NULL || out_inode == NULL) {
+    ext2_log("resolve: invalid arguments\n");
     return EINVAL;
-  if (depth > EXT2_MAX_SYMLINK_DEPTH)
+  }
+  if (depth > EXT2_MAX_SYMLINK_DEPTH) {
+    ext2_log_uint("resolve: symlink depth limit hit, depth ", (uint32_t)depth);
     return EINVAL;
+  }
 
   p = path;
   if (*p == '/') {
@@ -172,8 +195,10 @@ static int ext2_resolve_from(ext2_context_t *ctx, uint32_t start_ino,
   }
 
   rc = ext2_read_inode(ctx, current_ino, &current);
-  if (rc != 0)
+  if (rc != 0) {
+    ext2_log_uint("resolve: could not read starting inode ", current_ino);
     return rc;
+  }
 
   while (*p != '\0') {
     const char *name_start;
@@ -188,15 +213,20 @@ static int ext2_resolve_from(ext2_context_t *ctx, uint32_t start_ino,
     if (*p == '\0')
       break;
 
-    if (ext2_inode_type(&current) != EXT2_S_IFDIR)
+    if (ext2_inode_type(&current) != EXT2_S_IFDIR) {
+      ext2_log_uint("resolve: path component traverses non-directory inode ",
+                    current_ino);
       return EINVAL;
+    }
 
     name_start = p;
     while (*p != '\0' && *p != '/')
       ++p;
     name_len = (uint32_t)(p - name_start);
-    if (name_len == 0 || name_len > 255)
+    if (name_len == 0 || name_len > 255) {
+      ext2_log_uint("resolve: invalid path component length ", name_len);
       return ENOENT;
+    }
     memcpy(name, name_start, name_len);
     name[name_len] = '\0';
 
@@ -214,13 +244,17 @@ static int ext2_resolve_from(ext2_context_t *ctx, uint32_t start_ino,
       }
     } else {
       rc = ext2_dir_lookup(ctx, &current, name, (uint8_t)name_len, &next_ino);
-      if (rc != 0)
+      if (rc != 0) {
+        ext2_log_str("resolve: not found: ", name);
         return rc;
+      }
     }
 
     rc = ext2_read_inode(ctx, next_ino, &next);
-    if (rc != 0)
+    if (rc != 0) {
+      ext2_log_uint("resolve: could not read next inode ", next_ino);
       return rc;
+    }
 
     if (ext2_inode_type(&next) == EXT2_S_IFLNK) {
       char *link;
@@ -232,9 +266,12 @@ static int ext2_resolve_from(ext2_context_t *ctx, uint32_t start_ino,
       bool_t absolute;
 
       rc = ext2_readlink(ctx, &next, &link, &link_len);
-      if (rc != 0)
+      if (rc != 0) {
+        ext2_log_uint("resolve: symlink read failed, error ", (uint32_t)rc);
         return rc;
+      }
       if (link_len == 0) {
+        ext2_log_uint("resolve: empty symlink at inode ", next_ino);
         kfree(link);
         return ENOENT;
       }
@@ -247,6 +284,7 @@ static int ext2_resolve_from(ext2_context_t *ctx, uint32_t start_ino,
 
       combined = (char *)kmalloc(total_len + 1);
       if (combined == NULL) {
+        ext2_log("resolve: symlink path kmalloc failed\n");
         kfree(link);
         return ENOMEM;
       }
@@ -272,6 +310,8 @@ static int ext2_resolve_from(ext2_context_t *ctx, uint32_t start_ino,
 
   *out_ino = current_ino;
   *out_inode = current;
+  ext2_log_str("resolve: ", path);
+  ext2_log_uint("resolve: inode = ", current_ino);
   return 0;
 }
 

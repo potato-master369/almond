@@ -36,12 +36,19 @@ int ext2_read_block(ext2_context_t *ctx, uint32_t block, void *buf) {
   uint32_t lba;
 
   if (ctx == NULL || ctx->parent == NULL || ctx->parent->read == NULL ||
-      buf == NULL)
+      buf == NULL) {
+    ext2_log("read_block: invalid arguments\n");
     return EINVAL;
-  if (ext2_blk_to_lba(ctx, block, &lba) != 0)
+  }
+  if (ext2_blk_to_lba(ctx, block, &lba) != 0) {
+    ext2_log_uint("read_block: block out of range ", block);
     return EIO;
-  if (ctx->parent->read(ctx->parent, lba, ctx->sectors_per_block, buf) != 0)
+  }
+  if (ctx->parent->read(ctx->parent, lba, ctx->sectors_per_block, buf) != 0) {
+    ext2_log_uint("read_block: disk read failed for block ", block);
+    ext2_log_uint("read_block: sector = ", lba);
     return EIO;
+  }
   return 0;
 }
 
@@ -49,13 +56,20 @@ int ext2_write_block(ext2_context_t *ctx, uint32_t block, const void *buf) {
   uint32_t lba;
 
   if (ctx == NULL || ctx->parent == NULL || ctx->parent->write == NULL ||
-      buf == NULL)
+      buf == NULL) {
+    ext2_log("write_block: invalid arguments\n");
     return EINVAL;
-  if (ext2_blk_to_lba(ctx, block, &lba) != 0)
+  }
+  if (ext2_blk_to_lba(ctx, block, &lba) != 0) {
+    ext2_log_uint("write_block: block out of range ", block);
     return EIO;
+  }
   if (ctx->parent->write(ctx->parent, lba, ctx->sectors_per_block,
-                         (void *)buf) != 0)
+                         (void *)buf) != 0) {
+    ext2_log_uint("write_block: disk write failed for block ", block);
+    ext2_log_uint("write_block: sector = ", lba);
     return EIO;
+  }
   return 0;
 }
 
@@ -65,8 +79,10 @@ int ext2_read_bgd(ext2_context_t *ctx, uint32_t group, ext2_bgd_t *out) {
   uint32_t index;
   int rc;
 
-  if (ctx == NULL || out == NULL || group >= ctx->group_count)
+  if (ctx == NULL || out == NULL || group >= ctx->group_count) {
+    ext2_log_uint("read_bgd: invalid group ", group);
     return EINVAL;
+  }
 
   if (ctx->cached_group == (int32_t)group) {
     memcpy(out, ctx->block_group_desc, sizeof(*out));
@@ -94,8 +110,10 @@ int ext2_write_bgd(ext2_context_t *ctx, uint32_t group,
   uint32_t index;
   int rc;
 
-  if (ctx == NULL || in == NULL || group >= ctx->group_count)
+  if (ctx == NULL || in == NULL || group >= ctx->group_count) {
+    ext2_log_uint("write_bgd: invalid group ", group);
     return EINVAL;
+  }
 
   entries = ctx->gdt_entries_per_block;
   block = ctx->gdt_block + (group / entries);
@@ -125,8 +143,10 @@ uint32_t ext2_alloc_block(ext2_context_t *ctx) {
   uint32_t blocks_per_group;
   uint32_t block_size;
 
-  if (ctx == NULL)
+  if (ctx == NULL) {
+    ext2_log("alloc_block: invalid context\n");
     return 0;
+  }
 
   total_blocks = ctx->superblock->main.total_blocks;
   first_data = ctx->first_data_block;
@@ -140,8 +160,11 @@ uint32_t ext2_alloc_block(ext2_context_t *ctx) {
     uint32_t limit;
     uint32_t bit;
 
-    if (ext2_read_bgd(ctx, group, &bgd) != 0)
+    if (ext2_read_bgd(ctx, group, &bgd) != 0) {
+      ext2_log_uint("alloc_block: group descriptor read failed for group ",
+                    group);
       return 0;
+    }
     if (bgd.num_unalloc_blocks == 0)
       continue;
 
@@ -194,21 +217,27 @@ uint32_t ext2_alloc_block(ext2_context_t *ctx) {
     }
   }
 
+  ext2_log("alloc_block: no free blocks left\n");
   return 0;
 }
 
 int ext2_flush_super(ext2_context_t *ctx) {
   uint32_t lba;
 
-  if (ctx == NULL || ctx->parent == NULL || ctx->parent->write == NULL)
+  if (ctx == NULL || ctx->parent == NULL || ctx->parent->write == NULL) {
+    ext2_log("flush_super: invalid context or parent write callback\n");
     return EINVAL;
+  }
   if (!ctx->super_dirty)
     return 0;
 
   lba = ctx->lba_start + 2; // byte 1024 == sector 2 of the partition
-  if (ctx->parent->write(ctx->parent, lba, 2, ctx->superblock) != 0)
+  if (ctx->parent->write(ctx->parent, lba, 2, ctx->superblock) != 0) {
+    ext2_log_uint("flush_super: disk write failed at sector ", lba);
     return EIO;
+  }
 
   ctx->super_dirty = false;
+  ext2_log("flush_super: superblock written\n");
   return 0;
 }

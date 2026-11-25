@@ -6,6 +6,7 @@
 // records.  A record never crosses a filesystem block boundary.
 #include "ext2.h"
 #include "helpers/string.h"
+#include "messaging/messaging.h"
 
 typedef int (*ext2_dir_callback_t)(void *arg, const char *name,
                                    uint32_t name_len, uint32_t inode,
@@ -20,10 +21,14 @@ static int ext2_dir_iterate(ext2_context_t *ctx, const ext2_inode_t *dir,
   uint32_t block_count;
   uint32_t logical;
 
-  if (ctx == NULL || dir == NULL || callback == NULL)
+  if (ctx == NULL || dir == NULL || callback == NULL) {
+    ext2_log("dir_iterate: invalid arguments\n");
     return EINVAL;
-  if (ext2_inode_type(dir) != EXT2_S_IFDIR)
+  }
+  if (ext2_inode_type(dir) != EXT2_S_IFDIR) {
+    ext2_log("dir_iterate: inode is not a directory\n");
     return EINVAL;
+  }
 
   size = ext2_inode_size(dir);
   block_size = ctx->block_size;
@@ -39,14 +44,18 @@ static int ext2_dir_iterate(ext2_context_t *ctx, const ext2_inode_t *dir,
 
     rc = ext2_bmap(ctx, (ext2_inode_t *)dir, logical, false, &phys,
                    &inode_dirty);
-    if (rc != 0)
+    if (rc != 0) {
+      ext2_log_uint("dir_iterate: block mapping failed, error ", (uint32_t)rc);
       return rc;
+    }
     if (phys == 0)
       continue; // sparse directory block; nothing to read
 
     rc = ext2_read_block(ctx, phys, ctx->block_buf);
-    if (rc != 0)
+    if (rc != 0) {
+      ext2_log_uint("dir_iterate: block read failed, block ", phys);
       return rc;
+    }
 
     block_base = (uint64_t)logical * block_size;
     limit = block_size;
@@ -60,10 +69,14 @@ static int ext2_dir_iterate(ext2_context_t *ctx, const ext2_inode_t *dir,
       uint32_t name_len = de->name_length;
 
       if (rec_len < sizeof(ext2_dirent_t) || (rec_len & 3u) != 0 ||
-          off + rec_len > limit)
+          off + rec_len > limit) {
+        ext2_log_uint("dir_iterate: malformed record length ", rec_len);
         break; // malformed directory block
-      if (name_len > rec_len - sizeof(ext2_dirent_t))
+      }
+      if (name_len > rec_len - sizeof(ext2_dirent_t)) {
+        ext2_log_uint("dir_iterate: malformed name length ", name_len);
         break;
+      }
 
       if (de->inode != 0 && name_len != 0) {
         rc = callback(arg, de->name, name_len, de->inode,
@@ -108,8 +121,10 @@ int ext2_dir_lookup(ext2_context_t *ctx, const ext2_inode_t *dir,
   struct ext2_lookup_arg lookup;
   int rc;
 
-  if (name == NULL || out_ino == NULL)
+  if (name == NULL || out_ino == NULL) {
+    ext2_log("dir_lookup: invalid arguments\n");
     return EINVAL;
+  }
 
   lookup.name = name;
   lookup.name_len = name_len;
@@ -118,8 +133,10 @@ int ext2_dir_lookup(ext2_context_t *ctx, const ext2_inode_t *dir,
   rc = ext2_dir_iterate(ctx, dir, ext2_lookup_cb, &lookup);
   if (rc < 0)
     return rc;
-  if (lookup.inode == 0)
+  if (lookup.inode == 0) {
+    ext2_log("dir_lookup: name not found\n");
     return ENOENT;
+  }
 
   *out_ino = lookup.inode;
   return 0;
@@ -149,14 +166,19 @@ int ext2_dir_count_inode(ext2_context_t *ctx, const ext2_inode_t *dir,
   struct ext2_count_arg count;
   int rc;
 
-  if (out == NULL)
+  if (out == NULL) {
+    ext2_log("dir_count: invalid output pointer\n");
     return EINVAL;
+  }
 
   count.count = 0;
   rc = ext2_dir_iterate(ctx, dir, ext2_count_cb, &count);
-  if (rc < 0)
+  if (rc < 0) {
+    ext2_log_uint("dir_count: iteration failed, error ", (uint32_t)rc);
     return rc;
+  }
   *out = count.count;
+  ext2_log_uint("dir_count: entries = ", *out);
   return 0;
 }
 
@@ -198,8 +220,10 @@ int ext2_dir_index_inode(ext2_context_t *ctx, const ext2_inode_t *dir,
   struct ext2_index_arg arg;
   int rc;
 
-  if (out == NULL)
+  if (out == NULL) {
+    ext2_log("dir_index: invalid output pointer\n");
     return EINVAL;
+  }
 
   arg.target = index;
   arg.seen = 0;
@@ -209,7 +233,13 @@ int ext2_dir_index_inode(ext2_context_t *ctx, const ext2_inode_t *dir,
   out->name[0] = '\0';
 
   rc = ext2_dir_iterate(ctx, dir, ext2_index_cb, &arg);
-  if (rc < 0)
+  if (rc < 0) {
+    ext2_log_uint("dir_index: iteration failed, error ", (uint32_t)rc);
     return rc;
-  return arg.found ? 0 : ENOENT;
+  }
+  if (!arg.found) {
+    ext2_log_uint("dir_index: index out of range ", index);
+    return ENOENT;
+  }
+  return 0;
 }

@@ -96,10 +96,16 @@ int ext2_mount_part(partition_info_t *target, disk_info_t *parent,
   uint32_t rocompat;
   uint64_t fs_size;
 
-  if (target == NULL || parent == NULL || parent->read == NULL)
+  if (target == NULL || parent == NULL || parent->read == NULL) {
+    ext2_log("mount: invalid target or parent disk\n");
     return false;
-  if (part_n >= 4)
+  }
+  if (part_n >= 4) {
+    ext2_log_uint("mount: invalid partition number ", part_n);
     return false;
+  }
+
+  ext2_log_uint("mount: probing partition ", part_n);
 
   sb = (ext2_superblock_full_t *)kmalloc(sizeof(ext2_superblock_full_t));
   if (sb == NULL) {
@@ -194,6 +200,14 @@ int ext2_mount_part(partition_info_t *target, disk_info_t *parent,
     return false;
   }
 
+  ext2_log_uint("mount: block size = ", block_size);
+  ext2_log_uint("mount: inode size = ", inode_size);
+  ext2_log_uint("mount: total blocks = ", total_blocks);
+  ext2_log_uint("mount: total inodes = ", sb->main.num_inodes);
+  ext2_log_uint("mount: block groups = ", group_count);
+  ext2_log_uint("mount: blocks/group = ", blocks_per_group);
+  ext2_log_uint("mount: inodes/group = ", inodes_per_group);
+
   ctx = (ext2_context_t *)kmalloc(sizeof(ext2_context_t));
   if (ctx == NULL) {
     message_send_message(" ext2: context kmalloc fail!\n");
@@ -217,6 +231,8 @@ int ext2_mount_part(partition_info_t *target, disk_info_t *parent,
   ctx->fsid = EXT2_FSID(ext2_disk_index(parent), part_n);
   ctx->lba_start = parent->partition_metadata[part_n].lba_start;
   ctx->part_n = part_n;
+  ext2_log_uint("mount: fsid = ", ctx->fsid);
+  ext2_log_uint("mount: first sector = ", ctx->lba_start);
   ctx->block_size = block_size;
   ctx->sectors_per_block = block_size / SECTOR_SIZE;
   ctx->inode_size = inode_size;
@@ -266,21 +282,28 @@ int ext2_mount_part(partition_info_t *target, disk_info_t *parent,
   target->size = fs_size > 0xFFFFFFFFull ? 0xFFFFFFFFu : (uint32_t)fs_size;
 
   message_send_message(" ext2: found!\n");
+  ext2_log_uint("mount: mounted partition ", part_n);
   return true;
 }
 
 int ext2_umount_part(partition_info_t *target, uint8_t part_n) {
   ext2_context_t *ctx;
+  int frc;
 
   (void)part_n;
-  if (target == NULL)
+  if (target == NULL) {
+    ext2_log("umount: invalid target\n");
     return EINVAL;
+  }
 
   ctx = (ext2_context_t *)target->resv;
   if (ctx == NULL)
     return 0;
 
-  (void)ext2_flush_super(ctx);
+  ext2_log_uint("umount: fsid = ", ctx->fsid);
+  frc = ext2_flush_super(ctx);
+  if (frc != 0)
+    ext2_log_uint("umount: superblock flush failed, error ", (uint32_t)frc);
   ext2_unlink_context(ctx);
   ext2_free_context(ctx);
 
@@ -293,6 +316,7 @@ int ext2_umount_part(partition_info_t *target, uint8_t part_n) {
   target->dir_index = NULL;
   target->dir_count = NULL;
   target->present = false;
+  ext2_log("umount: complete\n");
   return 0;
 }
 
@@ -309,26 +333,37 @@ int ext2_openstream(almond_filehandle_t *fh, const char *filename) {
   uint32_t inode_n;
   int rc;
 
-  if (fh == NULL || filename == NULL)
+  if (fh == NULL || filename == NULL) {
+    ext2_log("open: invalid handle or filename\n");
     return EINVAL;
+  }
 
   ctx = ext2_context_from_fsid(fh->fsid);
-  if (ctx == NULL)
+  if (ctx == NULL) {
+    ext2_log_uint("open: unknown fsid ", fh->fsid);
     return ENOENT;
+  }
 
   rc = ext2_resolve_path(ctx, filename, &inode_n, &inode);
-  if (rc != 0)
+  if (rc != 0) {
+    ext2_log_uint("open: path resolution failed, error ", (uint32_t)rc);
     return rc;
+  }
 
   file = (ext2_file_t *)kmalloc(sizeof(ext2_file_t));
-  if (file == NULL)
+  if (file == NULL) {
+    ext2_log("open: file context kmalloc failed\n");
     return ENOMEM;
+  }
 
   file->fs = ctx;
   file->inode = inode;
   file->inode_n = inode_n;
   file->cursor = 0;
   file->flags = 0;
+
+  ext2_log_str("open: ", filename);
+  ext2_log_uint("open: inode = ", inode_n);
 
   fh->resv = (uint32_t)file;
   fh->inode_n = inode_n;
@@ -339,11 +374,14 @@ int ext2_openstream(almond_filehandle_t *fh, const char *filename) {
 int ext2_closestream(almond_filehandle_t *fh) {
   ext2_file_t *file;
 
-  if (fh == NULL)
+  if (fh == NULL) {
+    ext2_log("close: invalid handle\n");
     return EINVAL;
+  }
 
   file = ext2_file_from_handle(fh);
   if (file != NULL) {
+    ext2_log_uint("close: inode = ", file->inode_n);
     kfree(file);
     fh->resv = 0;
   }
@@ -356,16 +394,22 @@ int ext2_read(almond_filehandle_t *fh, void *to, int n) {
   int rc;
 
   file = ext2_file_from_handle(fh);
-  if (file == NULL || to == NULL)
+  if (file == NULL || to == NULL) {
+    ext2_log("read: invalid handle or buffer\n");
     return EINVAL;
+  }
   if (n <= 0)
     return 0;
 
   type = ext2_inode_type(&file->inode);
-  if (type == EXT2_S_IFDIR)
+  if (type == EXT2_S_IFDIR) {
+    ext2_log_uint("read: inode is a directory ", file->inode_n);
     return EISDIR;
-  if (type != EXT2_S_IFREG)
+  }
+  if (type != EXT2_S_IFREG) {
+    ext2_log_uint("read: unsupported inode type ", type);
     return EINVAL;
+  }
 
   // The cursor is kept in the private file context.  fh->pos is only a
   // mirror; if somebody changed it we honour that as the new cursor.
@@ -373,8 +417,12 @@ int ext2_read(almond_filehandle_t *fh, void *to, int n) {
     file->cursor = fh->pos;
 
   rc = ext2_read_file(file->fs, &file->inode, file->cursor, to, (uint32_t)n);
-  if (rc < 0)
+  if (rc < 0) {
+    ext2_log_uint("read: failed, error ", (uint32_t)rc);
     return rc;
+  }
+
+  ext2_log_uint("read: bytes = ", (uint32_t)rc);
 
   file->cursor += (uint32_t)rc;
   fh->pos = file->cursor;
@@ -389,37 +437,51 @@ int ext2_write(almond_filehandle_t *fh, void *from, int n) {
   int rc;
 
   file = ext2_file_from_handle(fh);
-  if (file == NULL || from == NULL)
+  if (file == NULL || from == NULL) {
+    ext2_log("write: invalid handle or buffer\n");
     return EINVAL;
+  }
   if (n <= 0)
     return 0;
 
   type = ext2_inode_type(&file->inode);
-  if (type == EXT2_S_IFDIR)
+  if (type == EXT2_S_IFDIR) {
+    ext2_log_uint("write: inode is a directory ", file->inode_n);
     return EISDIR;
-  if (type != EXT2_S_IFREG)
+  }
+  if (type != EXT2_S_IFREG) {
+    ext2_log_uint("write: unsupported inode type ", type);
     return EINVAL;
+  }
 
   if (fh->pos != file->cursor)
     file->cursor = fh->pos;
 
   rc = ext2_write_file(file->fs, &file->inode, file->cursor, from,
                        (uint32_t)n, &inode_dirty);
-  if (rc < 0)
+  if (rc < 0) {
+    ext2_log_uint("write: failed, error ", (uint32_t)rc);
     return rc;
+  }
+
+  ext2_log_uint("write: bytes = ", (uint32_t)rc);
 
   file->fs->superblock->main.last_write_time = (uint32_t)ext2_now();
   file->fs->super_dirty = true;
 
   if (inode_dirty) {
     int wrc = ext2_write_inode(file->fs, file->inode_n, &file->inode);
-    if (wrc != 0)
+    if (wrc != 0) {
+      ext2_log_uint("write: inode update failed, error ", (uint32_t)wrc);
       return wrc;
+    }
   }
   if (file->fs->super_dirty) {
     int src = ext2_flush_super(file->fs);
-    if (src != 0)
+    if (src != 0) {
+      ext2_log_uint("write: superblock flush failed, error ", (uint32_t)src);
       return src;
+    }
   }
 
   file->cursor += (uint32_t)rc;
@@ -437,17 +499,23 @@ int ext2_stat(almond_stat_t *out, const char *path) {
   uint32_t fsid;
   int rc;
 
-  if (out == NULL || path == NULL)
+  if (out == NULL || path == NULL) {
+    ext2_log("stat: invalid arguments\n");
     return EINVAL;
+  }
 
   fsid = out->fsid;
   ctx = ext2_context_from_fsid(fsid);
-  if (ctx == NULL)
+  if (ctx == NULL) {
+    ext2_log_uint("stat: unknown fsid ", fsid);
     return ENOENT;
+  }
 
   rc = ext2_resolve_path(ctx, path, &inode_n, &inode);
-  if (rc != 0)
+  if (rc != 0) {
+    ext2_log_uint("stat: path resolution failed, error ", (uint32_t)rc);
     return rc;
+  }
 
   type = ext2_inode_type(&inode);
   if (type == EXT2_S_IFREG)
@@ -457,12 +525,17 @@ int ext2_stat(almond_stat_t *out, const char *path) {
   else
     out->type = A_OTHER;
 
+  ext2_log_str("stat: ", path);
+  ext2_log_uint("stat: inode = ", inode_n);
+  ext2_log_uint("stat: type = ", type);
+
   out->r = (inode.permissions & EXT2_S_IRUSR) != 0;
   out->w = (inode.permissions & EXT2_S_IWUSR) != 0;
   out->x = (inode.permissions & EXT2_S_IXUSR) != 0;
 
   size = ext2_inode_size(&inode);
   out->size = size > 0xFFFFFFFFull ? 0xFFFFFFFFu : (uint32_t)size;
+  ext2_log_uint("stat: size = ", out->size);
   out->inode_n = inode_n;
   out->fsid = ctx->fsid;
   return 0;
@@ -498,14 +571,20 @@ int ext2_dir_index(almond_filehandle_t *dir, uint32_t index,
   rc = ext2_handle_dir(dir, &ctx, &inode);
   if (rc == 1) {
     rc = ext2_read_inode(ctx, dir->inode_n, &temp);
-    if (rc != 0)
+    if (rc != 0) {
+      ext2_log_uint("dir_index: inode read failed, error ", (uint32_t)rc);
       return rc;
+    }
     inode = &temp;
   } else if (rc != 0) {
+    ext2_log_uint("dir_index: invalid directory handle, error ", (uint32_t)rc);
     return rc;
   }
 
-  return ext2_dir_index_inode(ctx, inode, index, out);
+  rc = ext2_dir_index_inode(ctx, inode, index, out);
+  if (rc != 0)
+    ext2_log_uint("dir_index: lookup failed, error ", (uint32_t)rc);
+  return rc;
 }
 
 int ext2_dir_count(almond_filehandle_t *dir, uint32_t *out) {
@@ -517,12 +596,18 @@ int ext2_dir_count(almond_filehandle_t *dir, uint32_t *out) {
   rc = ext2_handle_dir(dir, &ctx, &inode);
   if (rc == 1) {
     rc = ext2_read_inode(ctx, dir->inode_n, &temp);
-    if (rc != 0)
+    if (rc != 0) {
+      ext2_log_uint("dir_count: inode read failed, error ", (uint32_t)rc);
       return rc;
+    }
     inode = &temp;
   } else if (rc != 0) {
+    ext2_log_uint("dir_count: invalid directory handle, error ", (uint32_t)rc);
     return rc;
   }
 
-  return ext2_dir_count_inode(ctx, inode, out);
+  rc = ext2_dir_count_inode(ctx, inode, out);
+  if (rc != 0)
+    ext2_log_uint("dir_count: scan failed, error ", (uint32_t)rc);
+  return rc;
 }

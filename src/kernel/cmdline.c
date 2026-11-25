@@ -2,22 +2,24 @@
 // ----------------------------
 // Handler for cmdline of kernel
 // kek
-#include "messaging/messaging.h"
-#include "helpers/string.h"
 #include "disk/disk.h"
 #include "disk/drv/ide.h"
+#include "helpers/string.h"
+#include "messaging/drv/com.h"
+#include "messaging/messaging.h"
 
 #include "cmdline.h"
 
 extern disk_featuremask_t disk_drivermasks;
 extern ide_featuremask_t ide_featuremask;
 extern core_featuremask_t core_featuremask;
+extern com_featureset_t com_featureset;
 extern char rootdisk[64];
 extern char rootfstype[64];
 uint16_t checkmask;
 
 void cmdline_parse_cmdline(const char *cmdline) {
-  int p,s;
+  int p, s;
   char wordbuf[64]; // kmalloc not active yet?
   checkmask = 0;
   s = 0;
@@ -48,6 +50,30 @@ void cmdline_parse_cmdline(const char *cmdline) {
     } else if (strncmp(wordbuf, "gvt", sizeof(wordbuf)) == 0) {
       core_featuremask.gvt = false;
       core_featuremask.bsman = true; // gvt implies -bsman
+    } else if (strncmp(wordbuf, "com.com", 7) == 0 && wordbuf[7] != '\0') {
+      switch (wordbuf[7]) {
+      case '1':
+        com_featureset.com1 = true;
+        break;
+      case '2':
+        com_featureset.com2 = true;
+        break;
+      default:
+        message_send_message("WARN:cmdline: unknown com.com* setting\n");
+        break;
+      }
+    } else if (strncmp(wordbuf, "-com.com", 8) == 0 && wordbuf[8] != '\0') {
+      switch (wordbuf[7]) {
+      case '1':
+        com_featureset.com1 = false;
+        break;
+      case '2':
+        com_featureset.com2 = false;
+        break;
+      default:
+        message_send_message("WARN:cmdline: unknown com.com* setting\n");
+        break;
+      }
     } else {
       char msgbuf[256] = "WARN:cmdline: unrecognised option: ";
       append_string(msgbuf, wordbuf, sizeof(msgbuf));

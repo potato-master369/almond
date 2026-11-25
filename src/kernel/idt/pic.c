@@ -2,9 +2,10 @@
 // ------------------------------
 // handles 8259 PIC
 
-// note to stupids: it says not used but that's cause LSP is goofy and can't figure that intX_t arent existing without this header.
-#include "kernel_types.h"
+// note to stupids: it says not used but that's cause LSP is goofy and can't
+// figure that intX_t arent existing without this header.
 #include "kernel_ports.h"
+#include "kernel_types.h"
 
 // defs
 #define PIC1 0x20
@@ -29,9 +30,9 @@
 #define CASCADE_IRQ 2
 
 void pic_send_eoi(uint8_t irq) {
-  if (irq >= 8) 
+  if (irq >= 8)
     outb(PIC2_COMMAND, PIC_EOI);
-  
+
   outb(PIC1_COMMAND, PIC_EOI);
 }
 
@@ -48,7 +49,7 @@ void pic_remap(int offset_1, int offset_2) {
   io_wait();
   outb(PIC2_DATA, CASCADE_IRQ);
   io_wait();
-  
+
   // make them use 8086 mode, not 8080
   outb(PIC1_DATA, ICW4_8086);
   io_wait();
@@ -64,6 +65,21 @@ void pic_remap(int offset_1, int offset_2) {
 void pic_disable(void) {
   outb(PIC1_DATA, 0xff);
   outb(PIC2_DATA, 0xff);
+}
+
+void pic_disable_irq(uint8_t irq) {
+  uint16_t port;
+  uint8_t value;
+
+  if (irq < 8)
+    port = 0x21;
+  else {
+    port = 0xA1;
+    irq -= 8;
+  }
+
+  value = inb(port);
+  outb(port, value | (1u << irq));
 }
 
 void pic_enable_irq(uint8_t irq) {

@@ -7,6 +7,7 @@
 // needs one scratch block even while allocating missing indirect blocks.
 #include "ext2.h"
 #include "helpers/string.h"
+#include "messaging/messaging.h"
 
 static uint32_t ext2_bmap_alloc(ext2_context_t *ctx, ext2_inode_t *inode,
                                 bool_t *inode_dirty) {
@@ -100,8 +101,10 @@ int ext2_bmap(ext2_context_t *ctx, ext2_inode_t *inode, uint32_t logical,
   uint32_t ptrs;
   uint64_t double_span;
 
-  if (ctx == NULL || inode == NULL || phys == NULL || inode_dirty == NULL)
+  if (ctx == NULL || inode == NULL || phys == NULL || inode_dirty == NULL) {
+    ext2_log("bmap: invalid arguments\n");
     return EINVAL;
+  }
 
   direct = &inode->dbp0;
   ptrs = ctx->ptrs_per_block;
@@ -136,6 +139,7 @@ int ext2_bmap(ext2_context_t *ctx, ext2_inode_t *inode, uint32_t logical,
     return ext2_bmap_indirect(ctx, inode, &inode->tibp, logical, 3, create,
                               phys, inode_dirty);
 
+  ext2_log_uint("bmap: logical block beyond triple indirect ", logical);
   return EINVAL;
 }
 
@@ -145,8 +149,10 @@ int ext2_read_file(ext2_context_t *ctx, ext2_inode_t *inode, uint64_t offset,
   uint32_t done = 0;
   uint8_t *dst = (uint8_t *)buf;
 
-  if (ctx == NULL || inode == NULL || buf == NULL)
+  if (ctx == NULL || inode == NULL || buf == NULL) {
+    ext2_log("read_file: invalid arguments\n");
     return EINVAL;
+  }
 
   size = ext2_inode_size(inode);
   if (offset >= size || count == 0)
@@ -164,12 +170,16 @@ int ext2_read_file(ext2_context_t *ctx, ext2_inode_t *inode, uint64_t offset,
 
     if (chunk > count - done)
       chunk = count - done;
-    if (logical64 > 0xFFFFFFFFull)
+    if (logical64 > 0xFFFFFFFFull) {
+      ext2_log("read_file: logical block number overflow\n");
       return EINVAL;
+    }
 
     rc = ext2_bmap(ctx, inode, (uint32_t)logical64, false, &phys, &dirty);
-    if (rc != 0)
+    if (rc != 0) {
+      ext2_log_uint("read_file: block mapping failed, error ", (uint32_t)rc);
       return rc;
+    }
 
     if (phys == 0) {
       uint32_t i;
@@ -177,12 +187,16 @@ int ext2_read_file(ext2_context_t *ctx, ext2_inode_t *inode, uint64_t offset,
         dst[done + i] = 0;
     } else if (within == 0 && chunk == ctx->block_size) {
       rc = ext2_read_block(ctx, phys, dst + done);
-      if (rc != 0)
+      if (rc != 0) {
+        ext2_log_uint("read_file: block read failed, block ", phys);
         return rc;
+      }
     } else {
       rc = ext2_read_block(ctx, phys, ctx->block_buf);
-      if (rc != 0)
+      if (rc != 0) {
+        ext2_log_uint("read_file: partial block read failed, block ", phys);
         return rc;
+      }
       memcpy(dst + done, ctx->block_buf + within, chunk);
     }
 
@@ -202,29 +216,40 @@ int ext2_write_file(ext2_context_t *ctx, ext2_inode_t *inode, uint64_t offset,
   const uint8_t *src = (const uint8_t *)buf;
   int last_error = 0;
 
-  if (ctx == NULL || inode == NULL || buf == NULL || inode_dirty == NULL)
+  if (ctx == NULL || inode == NULL || buf == NULL || inode_dirty == NULL) {
+    ext2_log("write_file: invalid arguments\n");
     return EINVAL;
+  }
   if (count == 0)
     return 0;
 
-  if (inode->flags & EXT2_INODE_FLAG_IMMUTABLE)
+  if (inode->flags & EXT2_INODE_FLAG_IMMUTABLE) {
+    ext2_log("write_file: inode is immutable\n");
     return EPERM;
+  }
 
   old_size = ext2_inode_size(inode);
   if (inode->flags & EXT2_INODE_FLAG_APPEND) {
-    if (offset != old_size)
+    if (offset != old_size) {
+      ext2_log_uint("write_file: append-only write at wrong offset ",
+                    (uint32_t)offset);
       return EPERM;
+    }
   }
 
   end = offset + (uint64_t)count;
-  if (end < offset)
+  if (end < offset) {
+    ext2_log("write_file: offset overflow\n");
     return EINVAL;
+  }
 
   if (end > 0xFFFFFFFFull &&
       (ctx->superblock->main.version_major < 1 ||
        (ctx->superblock->extend.ro_compat_features &
-        EXT2_FEATURE_RO_COMPAT_LARGE_FILE) == 0))
+        EXT2_FEATURE_RO_COMPAT_LARGE_FILE) == 0)) {
+    ext2_log("write_file: file too large for this filesystem\n");
     return EINVAL;
+  }
 
   while (done < count) {
     uint64_t logical64 = offset / ctx->block_size;
@@ -236,16 +261,19 @@ int ext2_write_file(ext2_context_t *ctx, ext2_inode_t *inode, uint64_t offset,
     if (chunk > count - done)
       chunk = count - done;
     if (logical64 > 0xFFFFFFFFull) {
+      ext2_log("write_file: logical block number overflow\n");
       last_error = EINVAL;
       break;
     }
 
     rc = ext2_bmap(ctx, inode, (uint32_t)logical64, true, &phys, inode_dirty);
     if (rc != 0) {
+      ext2_log_uint("write_file: block mapping failed, error ", (uint32_t)rc);
       last_error = rc;
       break;
     }
     if (phys == 0) {
+      ext2_log("write_file: no physical block available\n");
       last_error = ENOSPC;
       break;
     }
@@ -255,6 +283,7 @@ int ext2_write_file(ext2_context_t *ctx, ext2_inode_t *inode, uint64_t offset,
     } else {
       rc = ext2_read_block(ctx, phys, ctx->block_buf);
       if (rc != 0) {
+        ext2_log_uint("write_file: partial block read failed, block ", phys);
         last_error = rc;
         break;
       }
@@ -263,6 +292,7 @@ int ext2_write_file(ext2_context_t *ctx, ext2_inode_t *inode, uint64_t offset,
 
     rc = ext2_write_block(ctx, phys, ctx->block_buf);
     if (rc != 0) {
+      ext2_log_uint("write_file: block write failed, block ", phys);
       last_error = rc;
       break;
     }

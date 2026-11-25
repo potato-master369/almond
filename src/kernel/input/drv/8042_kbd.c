@@ -4,9 +4,11 @@
 //
 // The P/S2 KEYBOARD CONTROLLER ASHIAHSFIASHFASKFHASKJFH SO FUNNY AHAHAHAHAHAHA
 #include "idt/idt.h"
+#include "idt/pic.h"
 #include "input/input.h"
 #include "kernel_ports.h"
 #include "kernel_types.h"
+#include "helpers/string.h"
 #include "messaging/messaging.h"
 
 // keyboard
@@ -339,6 +341,39 @@ static const uint8_t ps2_set2_ext_to_hid[256] = {
     [0x74] = 0x4F, // Right Arrow
 };
 
+// IRQ state helpers
+static inline uint32_t irq_save(void) {
+    uint32_t flags;
+
+    // Push the flags register onto the stack, then pop it into the 'flags' variable.
+    // Afterward, disable interrupts using 'cli'.
+    __asm__ __volatile__(
+        "pushfl \n\t"
+        "popl %0 \n\t"
+        "cli"
+        : "=r"(flags)
+        :
+        : "memory"
+    );
+
+    return flags;
+}
+
+/**
+ * Restores a previously saved interrupt state.
+ * @param flags The saved flags from a previous call to irq_save().
+ */
+static inline void irq_restore(uint32_t flags) {
+    // Push the saved flags onto the stack, then pop them back into the flags register.
+    __asm__ __volatile__(
+        "pushl %0 \n\t"
+        "popfl"
+        :
+        : "rm"(flags)
+        : "memory", "cc"
+    );
+}
+
 static inline void io_delay() { inb(0x80); }
 static bool_t ps2_wait_input_clear(void) {
   uint32_t timeout = 100000;
@@ -395,14 +430,20 @@ static bool_t ps2_keyboard_command(uint8_t command) {
     if (response == KBD_ACK)
       return true;
 
-    if (response != KBD_RESEND)
+    if (response != KBD_RESEND) {
+      char msgbuf[50] = "ERR:unexpected PS/2 response ";
+      append_uint(msgbuf, response, sizeof(msgbuf));
+      append_string(msgbuf, "\n", sizeof(msgbuf));
+      message_send_message(msgbuf);
       return false;
+    }
   }
 
   return false;
 }
 
 void kbd_8042_isr_callback(uint8_t isr_n) {
+  (void)isr_n; // mark unused
   uint8_t status = inb(PS2_STATUS_PORT);
 
   if (!(status & 0x1))
@@ -488,6 +529,8 @@ static bool_t probe_8042_no_acpi(void) {
 }
 
 int kbd_8042_init(void) {
+  pic_disable_irq(0);
+  uint32_t flags = irq_save();
   message_send_message(" 8042_kbd: init\n");
   if (!probe_8042_no_acpi())
     return 1;
@@ -529,10 +572,15 @@ int kbd_8042_init(void) {
   uint8_t mask = inb(0x21);
   outb(0x21, mask & ~(1 << 1)); // enable IRQ1
   idt_register_isr(kbd_8042_isr_callback, 1);
+  irq_restore(flags);
   __asm__ volatile("sti");
+  pic_enable_irq(0);
   message_send_message(" 8042_kbd: finish init\n");
   return 0;
 fail:
+  pic_disable_irq(0);
   message_send_message("ERR:8042_kbd: Could not initialize P/S2 keyboard!!!\n");
+  irq_restore(flags);
+  __asm__ volatile("sti");
   return 1;
 }

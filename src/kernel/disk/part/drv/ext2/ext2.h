@@ -4,6 +4,38 @@
 
 #include "disk/disk.h"
 #include "include/def.h"
+#include "helpers/string.h"
+#include "messaging/messaging.h"
+
+// Small logging helpers shared by the ext2 sources.  message_send_message()
+// takes a single string, so the value-based variants format the label and
+// number into a stack buffer first.
+static inline void ext2_log(const char *message) {
+  message_send_message(" ext2: ");
+  message_send_message(message);
+}
+
+static inline void ext2_log_uint(const char *label, uint32_t value) {
+  char buf[96];
+
+  buf[0] = '\0';
+  append_string(buf, (char *)" ext2: ", sizeof(buf));
+  append_string(buf, (char *)label, sizeof(buf));
+  append_uint(buf, value, sizeof(buf));
+  append_string(buf, (char *)"\n", sizeof(buf));
+  message_send_message(buf);
+}
+
+static inline void ext2_log_str(const char *label, const char *value) {
+  char buf[192];
+
+  buf[0] = '\0';
+  append_string(buf, (char *)" ext2: ", sizeof(buf));
+  append_string(buf, (char *)label, sizeof(buf));
+  append_string(buf, (char *)value, sizeof(buf));
+  append_string(buf, (char *)"\n", sizeof(buf));
+  message_send_message(buf);
+}
 
 // A filesystem ID is just the disk and partition number packed together, as
 // suggested by almond_filehandle_t.  The upper 16 bits are the disk, the
